@@ -111,3 +111,10 @@ refresh_investment_prices:
   active_job: true
   queue: "scheduled"
   description: "Re-quotes manually tracked holdings and revalues those accounts during market hours"
+
+backfill_account_logos:
+  cron: "30 3 * * *" # 3:30 AM every day
+  class: "AccountLogoBackfillJob"
+  active_job: true
+  queue: "scheduled"
+  description: "Fetches icons for accounts with an institution domain and no logo"
