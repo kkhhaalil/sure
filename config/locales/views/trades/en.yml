@@ -10,6 +10,9 @@ en:
       account: Transfer account (optional)
       account_prompt: Search account
       amount: Amount
+      cash_impact: Cash impact (optional)
+      cash_impact_hint: "Leave blank for an ordinary purchase: the amount is quantity x price. Enter 0 for shares that arrived without any cash leaving the account - an RSU/ESPP vest or a transfer in."
+      cash_impact_placeholder: "Blank = quantity x price"
       fee: Transaction fee
       holding: Ticker symbol
       holding_optional: Ticker symbol (optional)
@@ -70,3 +73,6 @@ en:
       sell: Sell
       settings: Settings
       type_label: Type
+    trade:
+      no_cash_amount: "%{qty} × %{price}"
+      no_cash_hint: "Shares received without cash leaving the account (vest or transfer in). Cost basis comes from the price shown."

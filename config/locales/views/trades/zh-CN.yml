@@ -10,6 +10,9 @@ zh-CN:
       account: 转账账户（可选）
       account_prompt: 搜索账户
       amount: 金额
+      cash_impact: 现金影响（可选）
+      cash_impact_hint: "普通买入留空即可，金额按 数量 × 价格 计算。若股票是白拿的（RSU/ESPP 归属、转入），填 0。"
+      cash_impact_placeholder: "留空 = 数量 × 价格"
       fee: 交易手续费
       holding: 代码
       holding_optional: 代码（可选）
@@ -70,3 +73,6 @@ zh-CN:
       sell: 卖出
       settings: 设置
       type_label: 类型
+    trade:
+      no_cash_amount: "%{qty} × %{price}"
+      no_cash_hint: "股票是无偿获得的（归属或转入），没有现金进出。成本按显示的价格计算。"

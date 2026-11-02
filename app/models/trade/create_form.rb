@@ -20,7 +20,7 @@ class Trade::CreateForm
   SUPPORTED_TYPES = (ACTIVITY_LABELS.keys + TRANSFER_TYPES).freeze
 
   attr_accessor :account, :date, :amount, :currency, :qty,
-                :price, :fee, :ticker, :manual_ticker, :type, :transfer_account_id
+                :price, :fee, :cash_impact, :ticker, :manual_ticker, :type, :transfer_account_id
 
   # Either creates a trade, transaction, or transfer based on type
   # Returns the model, regardless of success or failure
@@ -66,7 +66,18 @@ class Trade::CreateForm
       end
 
       signed_qty = sell_side_trade? ? -qty.to_d.abs : qty.to_d.abs
-      signed_amount = signed_qty * price.to_d + fee.to_d
+      # A trade's entry amount is the cash that moved in or out of the account.
+      # Most trades move cash equal to quantity x price, but shares can arrive
+      # without any cash changing hands (an RSU/ESPP vest, a transfer in).
+      # Booking those at quantity x price would debit cash the account never
+      # held, so the balance would read "market value - cost" instead of market
+      # value. `cash_impact` lets the caller state the real cash leg (0 for an
+      # in-kind acquisition); blank keeps the quantity x price behaviour.
+      signed_amount = if cash_impact.nil? || cash_impact.to_s.strip.empty?
+        signed_qty * price.to_d + fee.to_d
+      else
+        cash_impact.to_d
+      end
       label = SECURITY_TRADE_LABELS.fetch(type)
 
       trade_entry = account.entries.new(

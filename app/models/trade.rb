@@ -64,6 +64,16 @@ class Trade < ApplicationRecord
     qty.negative?
   end
 
+  # Shares that arrived without any cash leaving the account: an RSU/ESPP vest,
+  # a transfer in. The quantity and price are real (price is the cost basis);
+  # only the cash leg is zero. Rows for these must not read as a $0.00 outflow.
+  def cashless_acquisition?
+    return false unless qty.to_d.positive?
+    return false unless entry
+
+    entry.amount.to_d.zero?
+  end
+
   # A negative quantity that left for another account you own. It looks exactly
   # like a sale — same sign, same shape — and only the label tells them apart.
   def internal_movement?

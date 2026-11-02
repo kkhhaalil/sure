@@ -5,6 +5,9 @@ zh-TW:
       account: 轉帳帳戶（選填）
       account_prompt: 搜尋帳戶
       amount: 金額
+      cash_impact: 現金影響（選填）
+      cash_impact_hint: "一般買入留空即可，金額按 數量 × 價格 計算。若股票是無償取得（RSU/ESPP 歸屬、轉入），填 0。"
+      cash_impact_placeholder: "留空 = 數量 × 價格"
       fee: 交易手續費
       holding: 股票代號
       holding_optional: 股票代號（選填）
@@ -56,3 +59,6 @@ zh-TW:
       sell: 賣出
       settings: 設定
       type_label: 類型
+    trade:
+      no_cash_amount: "%{qty} × %{price}"
+      no_cash_hint: "股票為無償取得（歸屬或轉入），沒有現金進出。成本按顯示的價格計算。"

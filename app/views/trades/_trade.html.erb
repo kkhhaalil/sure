@@ -64,9 +64,16 @@
             <%= icon "lock", size: "sm", class: "text-secondary" %>
           <% end %>
         <% end %>
-        <%= content_tag :p,
-                    format_money(-entry.amount_money),
-                    class: ["privacy-sensitive", "text-green-600": entry.amount.negative?] %>
+        <% if trade.cashless_acquisition? %>
+          <%= content_tag :p,
+                      t("trades.trade.no_cash_amount", qty: trade.qty.abs.to_s("F").sub(/\.0+\z/, ""), price: format_money(trade.price_money)),
+                      class: "text-secondary whitespace-nowrap text-right",
+                      title: t("trades.trade.no_cash_hint") %>
+        <% else %>
+          <%= content_tag :p,
+                      format_money(-entry.amount_money),
+                      class: [ "privacy-sensitive", "text-green-600": entry.amount.negative? ] %>
+        <% end %>
       </div>
     </div>
   <% end %>

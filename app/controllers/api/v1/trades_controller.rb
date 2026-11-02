@@ -164,7 +164,7 @@ class Api::V1::TradesController < Api::V1::BaseController
       params.require(:trade).permit(
         :account_id, :date, :qty, :price, :currency,
         :security_id, :ticker, :manual_ticker, :investment_activity_label, :category_id,
-        :fee, :type, :amount, :transfer_account_id
+        :fee, :type, :amount, :cash_impact, :transfer_account_id
       )
     end
 
@@ -325,12 +325,22 @@ class Api::V1::TradesController < Api::V1::BaseController
         return render_validation_error("Quantity and price are required", [ "qty and price must be present and positive" ])
       end
 
+      cash_impact = trade_params[:cash_impact]
+      if cash_impact.present?
+        begin
+          cash_impact = BigDecimal(cash_impact.to_s)
+        rescue ArgumentError, TypeError
+          return render_validation_error("Cash impact must be a number", [ "cash_impact must be numeric (use 0 for shares received without cash)" ])
+        end
+      end
+
       {
         account: account,
         date: trade_params[:date],
         qty: qty,
         price: price,
         fee: trade_params[:fee].to_d,
+        cash_impact: cash_impact,
         currency: trade_params[:currency].presence || account.currency,
         type: trade_params[:type].to_s.downcase,
         ticker: ticker_value,

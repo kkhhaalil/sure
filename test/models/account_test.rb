@@ -1268,6 +1268,7 @@ class AccountTest < ActiveSupport::TestCase
       v: InstitutionIcon::VERSION
     )
     assert_equal expected, account.logo_url
+  end
 
   test "institution_domain is normalized to a bare host" do
     {
