@@ -204,8 +204,15 @@ class AccountsController < ApplicationController
           end
         end
       else
-        # Manual accounts just need balance materialization
-        @account.sync_later
+        # A manual investment account has no provider to sync, and the daily
+        # price import skips a date it already has — so materializing alone
+        # would keep showing the quote fetched at the start of the day. Re-quote
+        # and revalue instead. Other manual accounts only need materialization.
+        if @account.holdings.exists?
+          IntradayPriceRefreshJob.perform_later(account_id: @account.id)
+        else
+          @account.sync_later
+        end
       end
     end
 

@@ -1322,6 +1322,17 @@ class AccountsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to account_url(@account)
   end
 
+  test "syncing a manual investment account re-quotes its holdings" do
+    account = accounts(:investment)
+    Account.any_instance.expects(:syncing?).returns(false)
+
+    assert_enqueued_with(job: IntradayPriceRefreshJob, args: [ { account_id: account.id } ]) do
+      post sync_account_url(account)
+    end
+
+    assert_redirected_to account_url(account)
+  end
+
   test "confirms unlink for linked account" do
     plaid_account = plaid_accounts(:one)
     AccountProvider.create!(account: @account, provider: plaid_account)

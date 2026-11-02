@@ -101,3 +101,13 @@ refresh_maintained_goal_targets:
   active_job: true
   queue: "scheduled"
   description: "Recomputes the floor of reserves expressed in months of expenses"
+
+refresh_investment_prices:
+  # 6:30, 8:30, 10:30 and 12:30 Pacific on weekdays — US market hours, every two
+  # hours. Kept inside the Twelve Data free tier (800 credits/day) with room to
+  # spare; see IntradayPriceRefreshJob.
+  cron: "30 6-13/2 * * 1-5 America/Los_Angeles"
+  class: "IntradayPriceRefreshJob"
+  active_job: true
+  queue: "scheduled"
+  description: "Re-quotes manually tracked holdings and revalues those accounts during market hours"
