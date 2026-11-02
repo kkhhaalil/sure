@@ -702,6 +702,12 @@ Rails.application.routes.draw do
     end
   end
 
+  # Cached brand icon for an institution domain (Account#logo_url). Authenticated
+  # like every other app route: it is an account-signalling asset, not public.
+  # The domain rides in a query parameter because a path segment would have its
+  # ".com" parsed off as a response format.
+  get "institution_icons", to: "institution_icons#show", as: :institution_icon
+
   resources :accounts, only: %i[index new show destroy], shallow: true do
     member do
       post :sync

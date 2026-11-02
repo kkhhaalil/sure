@@ -610,26 +610,30 @@ class TransactionsControllerTest < ActionDispatch::IntegrationTest
     assert_select "turbo-stream[target='#{dom_id(entry, :mark_recurring)}'] button[disabled]", text: /Mark as Recurring/
   end
 
-  test "transaction count represents filtered total" do
+  test "index no longer shows the totals summary bar" do
     family = families(:empty)
     sign_in users(:empty)
-    account = family.accounts.create! name: "Test", balance: 0, currency: "USD", accountable: Depository.new
+    family.accounts.create! name: "Test", balance: 0, currency: "USD", accountable: Depository.new
 
-    3.times do
-      create_transaction(account: account)
-    end
+    get transactions_url
 
-    get transactions_url(per_page: 10)
+    assert_response :success
+    assert_select "#total-transactions", count: 0
+    assert_select "#total-income", count: 0
+    assert_select "#total-expense", count: 0
+  end
 
-    assert_dom "#total-transactions", count: 1, text: family.entries.transactions.size.to_s
+  test "date filter offers relative date presets" do
+    family = families(:empty)
+    sign_in users(:empty)
+    family.accounts.create! name: "Test", balance: 0, currency: "USD", accountable: Depository.new
 
-    searchable_transaction = create_transaction(account: account, name: "Unique test name")
+    get transactions_url
 
-    get transactions_url(q: { search: searchable_transaction.name })
-
-    # Only finds 1 transaction that matches filter
-    assert_dom "#" + dom_id(searchable_transaction), count: 1
-    assert_dom "#total-transactions", count: 1, text: "1"
+    assert_response :success
+    assert_select "[data-date-filter-preset-preset-param]", count: 5
+    assert_select "[data-date-filter-preset-preset-param='today']", text: "Today"
+    assert_select "[data-date-filter-preset-preset-param='last_30_days']", text: "Last 30 days"
   end
 
   test "can update notes on split child transaction" do
@@ -960,78 +964,6 @@ end
     assert_equal expected_entry_ids.drop(10), page_2_entry_ids
     assert_empty page_1_entry_ids & page_2_entry_ids
     assert_equal expected_entry_ids, page_1_entry_ids + page_2_entry_ids
-  end
-
-  test "calls Transaction::Search totals method with correct search parameters" do
-    family = families(:empty)
-    sign_in users(:empty)
-    account = family.accounts.create! name: "Test", balance: 0, currency: "USD", accountable: Depository.new
-
-    create_transaction(account: account, amount: 100)
-
-    search = Transaction::Search.new(family)
-    totals = OpenStruct.new(
-      count: 1,
-      expense_money: Money.new(10000, "USD"),
-      income_money: Money.new(0, "USD"),
-      transfer_inflow_money: Money.new(0, "USD"),
-      transfer_outflow_money: Money.new(0, "USD")
-    )
-
-    Transaction::Search.expects(:new).with(family, filters: {}, accessible_account_ids: [ account.id ]).returns(search)
-    search.expects(:totals).once.returns(totals)
-
-    get transactions_url
-    assert_response :success
-  end
-
-  test "calls Transaction::Search totals method with filtered search parameters" do
-    family = families(:empty)
-    sign_in users(:empty)
-    account = family.accounts.create! name: "Test", balance: 0, currency: "USD", accountable: Depository.new
-    category = family.categories.create! name: "Food", color: "#ff0000"
-
-    create_transaction(account: account, amount: 100, category: category)
-
-    search = Transaction::Search.new(family, filters: { "categories" => [ "Food" ], "types" => [ "expense" ] })
-    totals = OpenStruct.new(
-      count: 1,
-      expense_money: Money.new(10000, "USD"),
-      income_money: Money.new(0, "USD"),
-      transfer_inflow_money: Money.new(0, "USD"),
-      transfer_outflow_money: Money.new(0, "USD")
-    )
-
-    Transaction::Search.expects(:new).with(family, filters: { "categories" => [ "Food" ], "types" => [ "expense" ] }, accessible_account_ids: [ account.id ]).returns(search)
-    search.expects(:totals).once.returns(totals)
-
-    get transactions_url(q: { categories: [ "Food" ], types: [ "expense" ] })
-    assert_response :success
-  end
-
-  test "shows inflow/outflow labels when filtering by transfers only" do
-    family = families(:empty)
-    sign_in users(:empty)
-    account = family.accounts.create! name: "Test", balance: 0, currency: "USD", accountable: Depository.new
-
-    create_transaction(account: account, amount: 100)
-
-    search = Transaction::Search.new(family, filters: { "types" => [ "transfer" ] })
-    totals = OpenStruct.new(
-      count: 2,
-      expense_money: Money.new(0, "USD"),
-      income_money: Money.new(0, "USD"),
-      transfer_inflow_money: Money.new(5000, "USD"),
-      transfer_outflow_money: Money.new(3000, "USD")
-    )
-
-    Transaction::Search.expects(:new).with(family, filters: { "types" => [ "transfer" ] }, accessible_account_ids: [ account.id ]).returns(search)
-    search.expects(:totals).once.returns(totals)
-
-    get transactions_url(q: { types: [ "transfer" ] })
-    assert_response :success
-    assert_select "#total-income", text: totals.transfer_inflow_money.format
-    assert_select "#total-expense", text: totals.transfer_outflow_money.format
   end
 
   test "mark_as_recurring creates a manual recurring transaction" do

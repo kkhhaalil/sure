@@ -203,12 +203,6 @@ en:
       review_recommended_short: Rev
       confirm_title: "Merge with posted transaction (%{posted_amount})"
       reject_title: Keep as separate transactions
-    summary:
-      total_transactions: Total transactions
-      income: Income
-      expenses: Expenses
-      inflow: Inflow
-      outflow: Outflow
     header:
       edit_categories: Edit categories
       edit_imports: Edit imports
@@ -332,6 +326,12 @@ en:
         date_filter:
           start_date: "Start date"
           end_date: "End date"
+          presets:
+            today: "Today"
+            yesterday: "Yesterday"
+            week_to_date: "Week to date"
+            month_to_date: "Month to date"
+            last_30_days: "Last 30 days"
         merchant_filter:
           filter_merchants: Filter merchants
         tag_filter:

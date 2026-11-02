@@ -79,6 +79,7 @@ export type Account = {
   status: string;
   institution_name: string | null;
   institution_domain: string | null;
+  logo_url: string | null;
 };
 
 export type SpendingRow = { id: string; name: string; color: string; total: string; normal: string | null; change: string | null; ratio: string | null };

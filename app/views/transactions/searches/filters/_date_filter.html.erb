@@ -1,11 +1,30 @@
 <%# locals: (form:) %>
-<div class="p-3">
+<%
+  presets = {
+    today: t(".presets.today"),
+    yesterday: t(".presets.yesterday"),
+    week_to_date: t(".presets.week_to_date"),
+    month_to_date: t(".presets.month_to_date"),
+    last_30_days: t(".presets.last_30_days")
+  }
+%>
+<div class="p-3" data-controller="date-filter-preset">
+  <div class="flex flex-wrap gap-2 mb-3">
+    <% presets.each do |key, label| %>
+      <button type="button"
+              class="rounded-md border border-secondary px-2.5 py-1 text-xs font-medium text-secondary hover:bg-surface-hover"
+              data-action="date-filter-preset#apply"
+              data-date-filter-preset-preset-param="<%= key %>"><%= label %></button>
+    <% end %>
+  </div>
   <%= form.date_field :start_date,
                       placeholder: t(".start_date"),
                       value: @q[:start_date],
+                      data: { "date-filter-preset-target": "start" },
                       class: "block w-full border border-secondary rounded-md bg-container py-2 pl-3 pr-3 text-base sm:text-sm focus-visible:ring-2 focus-visible:ring-alpha-black-300" %>
   <%= form.date_field :end_date,
                       placeholder: t(".end_date"),
                       value: @q[:end_date],
+                      data: { "date-filter-preset-target": "end" },
                       class: "block w-full border border-secondary rounded-md bg-container py-2 pl-3 pr-3 text-base sm:text-sm mt-2 focus-visible:ring-2 focus-visible:ring-alpha-black-300" %>
 </div>

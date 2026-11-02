@@ -136,9 +136,21 @@ export function Accounts() {
 function AccountRow({ account }: { account: Account }) {
   return (
     <button className="row pressable" onClick={() => openSheet({ account: account.id })}>
-      <span className="avatar" aria-hidden>
-        {initials(account.institution_name ?? account.name)}
-      </span>
+      {account.logo_url ? (
+        <img
+          className="avatar"
+          src={account.logo_url}
+          alt=""
+          width={36}
+          height={36}
+          loading="lazy"
+          style={{ objectFit: "contain", background: "#fff" }}
+        />
+      ) : (
+        <span className="avatar" aria-hidden>
+          {initials(account.institution_name ?? account.name)}
+        </span>
+      )}
       <span className="grow" style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
         <span className="name">{account.name}</span>
         <span className="sub">{account.institution_name ?? (account.subtype ?? account.account_type).replace(/_/g, " ")}</span>

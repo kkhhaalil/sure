@@ -17,6 +17,15 @@ class AccountsControllerTest < ActionDispatch::IntegrationTest
     assert_select "p.ml-auto.privacy-sensitive"
   end
 
+  test "index renders the institution icon for an account with a matched institution" do
+    @account.update!(name: "Sapphire Preferred (...4288)")
+
+    get accounts_url
+
+    assert_response :success
+    assert_select "img[src*='/institution_icons?institution=chase.com']"
+  end
+
   test "show points an unmatched transaction with a counterpart to the transfer matcher" do
     outflow = create_transaction(account: @account, name: "Hint outflow", amount: 500, date: Date.current)
     create_transaction(account: accounts(:credit_card), name: "Hint inflow", amount: -500, date: Date.current)

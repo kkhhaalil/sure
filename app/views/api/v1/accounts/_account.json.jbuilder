@@ -16,5 +16,7 @@ json.subtype account.subtype
 json.status account.status
 json.institution_name account.institution_name
 json.institution_domain account.institution_domain
+logo_url = account.logo_url
+json.logo_url(logo_url.present? ? (logo_url.start_with?("http") ? logo_url : "#{request.base_url}#{logo_url}") : nil)
 json.created_at account.created_at.iso8601
 json.updated_at account.updated_at.iso8601

@@ -1210,6 +1210,61 @@ class AccountTest < ActiveSupport::TestCase
     assert_includes Account.annotatable_by(member).pluck(:id), accounts(:credit_card).id, "read_write share"
   end
 
+  test "an account named after a card gets its institution matched automatically" do
+    account = @family.accounts.create!(
+      owner: @admin,
+      name: "Sapphire Preferred (...4288)",
+      balance: 0,
+      currency: "USD",
+      accountable: CreditCard.new
+    )
+
+    assert_equal "chase.com", account.institution_domain
+    assert_equal "Chase", account.institution_name
+  end
+
+  test "an institution already set by the user or a provider is left alone" do
+    account = @family.accounts.create!(
+      owner: @admin,
+      name: "Sapphire Preferred (...4288)",
+      balance: 0,
+      currency: "USD",
+      institution_name: "My Bank",
+      institution_domain: "mybank.example",
+      accountable: CreditCard.new
+    )
+
+    assert_equal "mybank.example", account.institution_domain
+    assert_equal "My Bank", account.institution_name
+  end
+
+  test "an account the catalog cannot place keeps a blank institution" do
+    account = @family.accounts.create!(
+      owner: @admin,
+      name: "Savings",
+      balance: 0,
+      currency: "USD",
+      accountable: Depository.new
+    )
+
+    assert_nil account.institution_domain
+    assert_nil account.logo_url
+  end
+
+  test "logo_url falls back to the locally cached institution icon" do
+    account = @family.accounts.create!(
+      owner: @admin,
+      name: "Discover it",
+      balance: 0,
+      currency: "USD",
+      accountable: CreditCard.new
+    )
+
+    Setting.stubs(:brand_fetch_client_id).returns(nil)
+
+    assert_equal "/institution_icons?institution=discover.com", account.logo_url
+  end
+
   private
     def create_loan_with_start_date(start_date, opening_balance_date)
       Account.create_and_sync(

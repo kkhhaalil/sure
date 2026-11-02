@@ -2,6 +2,10 @@ class Account < ApplicationRecord
   include AASM, Syncable, Monetizable, Chartable, Linkable, Enrichable, Anchorable, Reconcileable, TaxTreatable
 
   before_validation :assign_default_owner, if: -> { owner_id.blank? }
+  # Fills institution_name / institution_domain from the account's own name when
+  # neither the user nor a provider supplied them, so the account shows its
+  # bank's name and icon instead of a lettermark (see InstitutionCatalog).
+  before_save :match_institution, if: :institution_unset?
 
   before_destroy :capture_account_statement_ids_to_move
   before_destroy :cleanup_transfers
@@ -613,12 +617,24 @@ class Account < ApplicationRecord
       end
   end
 
+  # The institution behind this account. Order: what is stored on the account
+  # (typed by the user, or written by an import), then the catalog's read on the
+  # account's own name, then whatever the sync provider reports. The catalog sits
+  # ahead of the provider because provider links can carry the wrong institution
+  # (a card named "Discover it" pointing at a Capital One connection), while a
+  # name the catalog recognizes is what the user sees on the account.
   def institution_name
-    read_attribute(:institution_name).presence || provider&.institution_name
+    read_attribute(:institution_name).presence || matched_institution&.name || provider&.institution_name
   end
 
   def institution_domain
-    read_attribute(:institution_domain).presence || provider&.institution_domain
+    read_attribute(:institution_domain).presence || matched_institution&.domain || provider&.institution_domain
+  end
+
+  def matched_institution
+    return @matched_institution if defined?(@matched_institution)
+
+    @matched_institution = InstitutionCatalog.match(name)
   end
 
   def manual_crypto_exchange?
@@ -678,7 +694,29 @@ class Account < ApplicationRecord
       provider.logo_url
     elsif logo.attached?
       Rails.application.routes.url_helpers.rails_blob_path(logo, only_path: true)
+    elsif institution_domain.present?
+      # Self-hosted installs rarely hold a Brandfetch client id, so fall back to
+      # the app's own cached icon route rather than rendering a lettermark for
+      # every account the catalog could identify.
+      Rails.application.routes.url_helpers.institution_icon_path(institution: institution_domain)
     end
+  end
+
+  # Sets the institution behind this account from its name, unless something
+  # already claims one. A manual institution_domain the user typed is therefore
+  # never overwritten, and a name the catalog doesn't know is left alone.
+  def match_institution
+    entry = InstitutionCatalog.match(name, read_attribute(:institution_name))
+    return if entry.nil?
+
+    write_attribute(:institution_name, entry.name) if read_attribute(:institution_name).blank?
+    write_attribute(:institution_domain, entry.domain)
+  end
+
+  # Safe to persist the catalog's match: nothing is stored and the sync provider
+  # has no institution of its own to respect.
+  def institution_unset?
+    read_attribute(:institution_domain).blank? && provider&.institution_domain.blank?
   end
 
   # Marks the account pending_deletion and enqueues DestroyJob. If the enqueue
