@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="<%= I18n.locale %>">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+    <title><%= product_name %></title>
+    <%= csrf_meta_tags %>
+    <meta name="theme-color" content="#0B4B38">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="<%= product_name %>">
+    <link rel="manifest" href="/m/manifest.webmanifest">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="stylesheet" href="/m-app/index.css?v=<%= @asset_version %>">
+    <script type="module" src="/m-app/index.js?v=<%= @asset_version %>"></script>
+  </head>
+  <body>
+    <div id="sure-mobile-root"></div>
+    <noscript><%= product_name %> needs JavaScript.</noscript>
+  </body>
+</html>

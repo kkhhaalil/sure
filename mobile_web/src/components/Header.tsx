@@ -1,0 +1,71 @@
+import { MessageCircle, Settings } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { navigate } from "../lib/router";
+
+export const TABS = [
+  { path: "/", label: "Home" },
+  { path: "/transactions", label: "Transactions" },
+  { path: "/spending", label: "Spending" },
+  { path: "/accounts", label: "Accounts" },
+  { path: "/recurring", label: "Recurring" },
+] as const;
+
+export function Header({ active }: { active: string }) {
+  const tabsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    tabsRef.current?.querySelector<HTMLElement>("[aria-selected=true]")?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  }, [active]);
+
+  return (
+    <header className="header">
+      <div className="header-bar">
+        <button className="icon-btn pressable" aria-label="Settings" onClick={() => navigate("/settings")}>
+          <Settings size={24} strokeWidth={1.8} />
+        </button>
+        <span className="title">Sure</span>
+        <button className="icon-btn pressable" aria-label="Assistant" onClick={() => navigate("/assistant")}>
+          <MessageCircle size={24} strokeWidth={1.8} />
+        </button>
+      </div>
+      <nav className="tabs" role="tablist" ref={tabsRef}>
+        {TABS.map((tab) => (
+          <button key={tab.path} role="tab" aria-selected={tab.path === active} className="tab pressable" onClick={() => navigate(tab.path, { replace: true })}>
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+    </header>
+  );
+}
+
+// Horizontal swipe on the page body moves between tabs, like Copilot.
+export function useTabSwipe(active: string) {
+  useEffect(() => {
+    let x0 = 0;
+    let y0 = 0;
+    let tracking = false;
+    const down = (e: TouchEvent) => {
+      if ((e.target as HTMLElement).closest(".sheet, .tabs, [data-noswipe]")) return;
+      x0 = e.touches[0].clientX;
+      y0 = e.touches[0].clientY;
+      tracking = x0 > 24 && x0 < innerWidth - 24; // leave the edges to the browser's back gesture
+    };
+    const up = (e: TouchEvent) => {
+      if (!tracking) return;
+      tracking = false;
+      const dx = e.changedTouches[0].clientX - x0;
+      const dy = e.changedTouches[0].clientY - y0;
+      if (Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.6) return;
+      const i = TABS.findIndex((t) => t.path === active);
+      const next = TABS[i + (dx < 0 ? 1 : -1)];
+      if (next) navigate(next.path, { replace: true });
+    };
+    addEventListener("touchstart", down, { passive: true });
+    addEventListener("touchend", up);
+    return () => {
+      removeEventListener("touchstart", down);
+      removeEventListener("touchend", up);
+    };
+  }, [active]);
+}

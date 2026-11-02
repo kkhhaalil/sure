@@ -1045,6 +1045,13 @@ Rails.application.routes.draw do
   # Can be used by load balancers and uptime monitors to verify that the app is live.
   get "up" => "rails/health#show", as: :rails_health_check
 
+  # Installable mobile web app (client-rendered, talks to /api/v1).
+  get "m/manifest.webmanifest" => "mobile_app#manifest", as: :mobile_app_manifest
+  get "m/sw.js" => "mobile_app#service_worker", as: :mobile_app_service_worker
+  post "m/session_token" => "mobile_app#session_token", as: :mobile_app_session_token
+  get "m" => "mobile_app#show", as: :mobile_app
+  get "m/*path" => "mobile_app#show", format: false
+
   # Render dynamic PWA files from app/views/pwa/*
   get "service-worker" => "pwa#service_worker", as: :pwa_service_worker, defaults: { format: :js }
   get "manifest" => "pwa#manifest", as: :pwa_manifest, defaults: { format: :json }

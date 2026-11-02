@@ -134,3 +134,7 @@ logs/security/
 # Ignore Playwright artifacts
 playwright-report/
 .playwright-mcp
+
+# Mobile web app build output (npm --prefix mobile_web run build)
+/public/m-app
+/mobile_web/node_modules

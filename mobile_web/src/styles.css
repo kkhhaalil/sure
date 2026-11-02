@@ -1,0 +1,556 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter+Tight:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap");
+
+/* Alpine: snow ground, evergreen brand, signal red / sunlit amber / meadow green for budget state. */
+:root {
+  --ground: #f2f5f3;
+  --surface: #ffffff;
+  --surface-sunk: #eef2f0;
+  --line: #e6ece9;
+  --ink: #0f1a16;
+  --ink-2: #4a5852;
+  --ink-3: #66756e;
+  --ink-4: #9aa6a0;
+  --brand: #0e5a44;
+  --brand-deep: #0b4b38;
+  --brand-tint: #e3eee9;
+  --over: #e0483c;
+  --over-tint: #fbe4e1;
+  --warn: #e6a13a;
+  --warn-ink: #a9701a;
+  --warn-tint: #fbefd9;
+  --good: #2e9c5a;
+  --good-ink: #2e7d4f;
+  --good-tint: #e3f3e9;
+  --scrim: rgb(8 20 15 / 0.45);
+  --shadow: 0 1px 2px rgb(15 26 22 / 0.05);
+  --shadow-lift: 0 10px 30px rgb(15 26 22 / 0.1);
+  --radius-card: 22px;
+  --radius-row: 14px;
+  --font: "Inter", system-ui, -apple-system, sans-serif;
+  --display: "Inter Tight", "Inter", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  --spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #0b110e;
+    --surface: #141c18;
+    --surface-sunk: #1b2520;
+    --line: #233029;
+    --ink: #eef3f0;
+    --ink-2: #b6c2bc;
+    --ink-3: #8c9a93;
+    --ink-4: #66736c;
+    --brand: #3fae86;
+    --brand-deep: #0a3a2c;
+    --brand-tint: #16302a;
+    --over: #ff6b5e;
+    --over-tint: #3a1c19;
+    --warn: #f0b354;
+    --warn-ink: #f0b354;
+    --warn-tint: #352a16;
+    --good: #4cc27c;
+    --good-ink: #6fd69a;
+    --good-tint: #15301f;
+    --scrim: rgb(0 0 0 / 0.6);
+    --shadow: none;
+    --shadow-lift: 0 10px 30px rgb(0 0 0 / 0.4);
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The html ground sits under the status bar: iOS fades the top edge with it
+   and picks the status bar text color from it, so it matches the header. */
+html {
+  background: var(--brand-deep);
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 16px;
+}
+
+body {
+  background: var(--ground);
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: none;
+}
+
+#sure-mobile-root {
+  min-height: 100dvh;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+input,
+textarea {
+  font: inherit;
+  font-size: 17px; /* 16px+ keeps iOS from zooming on focus */
+  color: var(--ink);
+}
+
+/* Press feedback stands in for haptics. */
+.pressable {
+  transition: transform 160ms var(--spring), opacity 160ms;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.pressable:active {
+  transform: scale(0.97);
+  opacity: 0.85;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* ---------- Header ---------- */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding-top: var(--safe-top);
+  background: linear-gradient(180deg, var(--brand-deep) 0%, #0e5a44 70%, #12684f 100%);
+  color: #fff;
+  view-transition-name: header;
+}
+.header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 52px;
+  padding: 0 14px;
+}
+.header-bar .title {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 24px;
+  letter-spacing: -0.02em;
+}
+.icon-btn {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  color: rgb(255 255 255 / 0.88);
+  border-radius: 22px;
+}
+.tabs {
+  display: flex;
+  gap: 6px;
+  padding: 0 16px 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+}
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+.tab {
+  flex-shrink: 0;
+  padding: 7px 13px;
+  border-radius: 18px;
+  font-size: 15px;
+  font-weight: 500;
+  color: rgb(255 255 255 / 0.78);
+  scroll-snap-align: center;
+  transition: background 220ms var(--spring), color 220ms;
+}
+.tab[aria-selected="true"] {
+  background: #fff;
+  color: #0e5a44;
+  font-weight: 600;
+}
+
+/* ---------- Page ---------- */
+.page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 16px 16px calc(32px + var(--safe-bottom));
+  view-transition-name: page;
+}
+.page.plain {
+  padding-top: calc(var(--safe-top) + 8px);
+}
+
+.card {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow);
+}
+.card.pad {
+  padding: 18px;
+}
+.card.list {
+  padding: 4px 16px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 4px;
+}
+.eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.link {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--brand);
+}
+
+.display {
+  font-family: var(--display);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.muted {
+  color: var(--ink-3);
+}
+.num {
+  font-variant-numeric: tabular-nums;
+}
+.over {
+  color: var(--over);
+}
+.good {
+  color: var(--good);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+.badge.good {
+  background: var(--good-tint);
+  color: var(--good-ink);
+}
+.badge.over {
+  background: var(--over-tint);
+  color: var(--over);
+}
+
+/* Category chip: uses the category's own color at low alpha. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 4px 7px;
+  border-radius: 7px;
+  white-space: nowrap;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chip.empty {
+  background: var(--surface-sunk);
+  color: var(--ink-3);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 10px 0;
+  width: 100%;
+  text-align: left;
+}
+.row + .row {
+  border-top: 1px solid var(--line);
+}
+.row .grow {
+  flex: 1;
+  min-width: 0;
+}
+.row .name {
+  font-size: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.row .sub {
+  font-size: 13px;
+  color: var(--ink-3);
+}
+.row .amt {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  flex-shrink: 0;
+  min-width: 76px;
+}
+
+.btn {
+  height: 54px;
+  border-radius: 16px;
+  font-size: 17px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+}
+.btn.primary {
+  background: var(--ink);
+  color: var(--surface);
+}
+.btn.brand {
+  background: var(--brand);
+  color: #fff;
+}
+.btn.soft {
+  background: var(--surface-sunk);
+  color: var(--ink);
+}
+.btn.outline {
+  border: 1.5px solid var(--line);
+  background: var(--surface);
+}
+.btn.tint {
+  height: 44px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--brand-tint);
+  color: var(--brand);
+  border-radius: 14px;
+}
+.btn:disabled {
+  opacity: 0.5;
+}
+
+.field {
+  height: 54px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1.5px solid var(--line);
+  padding: 0 16px;
+  width: 100%;
+  outline: none;
+}
+.field:focus {
+  border-color: var(--brand);
+  background: var(--surface);
+}
+
+.seg {
+  display: flex;
+  justify-content: space-between;
+}
+.seg button {
+  font-size: 13px;
+  color: var(--ink-3);
+  padding: 6px 10px;
+  border-radius: 9px;
+}
+.seg button[aria-pressed="true"] {
+  background: var(--surface-sunk);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* ---------- Sheets ---------- */
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--scrim);
+  animation: fade-in 260ms ease-out both;
+}
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 41;
+  max-height: calc(100dvh - var(--safe-top) - 40px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-radius: 28px 28px 0 0;
+  padding-bottom: var(--safe-bottom);
+  animation: sheet-in 420ms var(--spring) both;
+  touch-action: pan-x;
+  will-change: transform;
+}
+.sheet.closing {
+  animation: sheet-out 260ms ease-in both;
+}
+.scrim.closing {
+  animation: fade-out 260ms ease-in both;
+}
+.grabber {
+  width: 40px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--line);
+  margin: 10px auto 4px;
+  flex-shrink: 0;
+}
+.sheet-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 6px 22px 24px;
+  touch-action: pan-y;
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes sheet-out {
+  to {
+    transform: translateY(100%);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-sunk) 0%, var(--line) 50%, var(--surface-sunk) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s linear infinite;
+  border-radius: 10px;
+}
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + var(--safe-bottom));
+  transform: translateX(-50%);
+  z-index: 60;
+  background: var(--ink);
+  color: var(--surface);
+  padding: 12px 18px;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 500;
+  box-shadow: var(--shadow-lift);
+  animation: toast-in 360ms var(--spring) both;
+  white-space: nowrap;
+}
+@keyframes toast-in {
+  from {
+    transform: translate(-50%, 24px);
+    opacity: 0;
+  }
+}
+
+.fab {
+  position: fixed;
+  right: 20px;
+  bottom: calc(24px + var(--safe-bottom));
+  width: 56px;
+  height: 56px;
+  border-radius: 28px;
+  background: var(--ink);
+  color: var(--surface);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 8px 20px rgb(15 26 22 / 0.25);
+  z-index: 15;
+}
+
+.offline {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--warn-tint);
+  color: var(--warn-ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  padding: calc(var(--safe-top) + 6px) 16px 6px;
+}
+
+::view-transition-old(page),
+::view-transition-new(page) {
+  animation-duration: 180ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+/* Wider screens: keep the phone column, centered. */
+@media (min-width: 640px) {
+  #sure-mobile-root {
+    max-width: 480px;
+    margin: 0 auto;
+    box-shadow: 0 0 0 1px var(--line);
+  }
+  .sheet,
+  .fab {
+    max-width: 480px;
+    margin: 0 auto;
+  }
+}
