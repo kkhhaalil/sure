@@ -9,7 +9,7 @@ import { queryClient } from "../lib/query";
 // header away). Pull down at the top to refetch everything on screen.
 const positions = new Map<string, number>();
 
-export function Scroller({ id, children }: { id: string; children: ReactNode }) {
+export function Scroller({ id, sky, children }: { id: string; sky?: "long" | "short"; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pull, setPull] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -57,7 +57,7 @@ export function Scroller({ id, children }: { id: string; children: ReactNode }) 
   }, [busy]);
 
   return (
-    <div className="scroller" ref={ref} onScroll={(e) => positions.set(id, e.currentTarget.scrollTop)}>
+    <div className={sky ? `scroller sky ${sky}` : "scroller"} ref={ref} onScroll={(e) => positions.set(id, e.currentTarget.scrollTop)}>
       <div className="pull" style={{ height: pull, transition: start.current === null ? "height 260ms var(--spring)" : "none" }} aria-hidden>
         {pull > 0 && <span className={`spinner${busy ? " spinning" : ""}`} style={busy ? undefined : { transform: `rotate(${pull * 4}deg)`, opacity: Math.min(1, pull / 64) }} />}
       </div>
@@ -72,7 +72,7 @@ export function FetchingBar() {
   return <div className={`fetching${fetching ? " on" : ""}`} aria-hidden />;
 }
 
-// A pushed screen: evergreen bar (the status bar text is always light),
+// A pushed screen: a blue bar (the status bar text is always light),
 // a title, back or close, one optional action, and an optional footer that
 // stays above the home indicator.
 export function PushedScreen({
@@ -94,7 +94,7 @@ export function PushedScreen({
 }) {
   return (
     <div className="app">
-      <header className="header">
+      <header className="header pushed">
         <div className="header-bar">
           <button className="icon-btn pressable" aria-label={close ? "Close" : "Back"} onClick={() => back(fallback)}>
             {close ? <X size={24} strokeWidth={2} /> : <ChevronLeft size={28} strokeWidth={2} />}

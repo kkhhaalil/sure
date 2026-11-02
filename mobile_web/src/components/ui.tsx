@@ -1,4 +1,5 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { ChevronRight } from "lucide-react";
+import { type CSSProperties, type ReactNode, useEffect, useId, useState } from "react";
 import { type CategoryRef } from "../lib/types";
 
 export function Section({ title, action, onAction, children }: { title: string; action?: string; onAction?: () => void; children: ReactNode }) {
@@ -9,6 +10,7 @@ export function Section({ title, action, onAction, children }: { title: string; 
         {action && (
           <button className="link pressable" onClick={onAction}>
             {action}
+            <ChevronRight size={16} strokeWidth={2.4} aria-hidden />
           </button>
         )}
       </div>
@@ -26,9 +28,30 @@ function alpha(hex: string | undefined, a: number) {
 export function CategoryChip({ category, placeholder = "Add category" }: { category: CategoryRef | null | undefined; placeholder?: string }) {
   if (!category) return <span className="chip empty">{placeholder}</span>;
   return (
-    <span className="chip">
-      <Dot color={category.color} size={8} />
+    <span className="chip" style={{ "--c": category.color } as CSSProperties}>
       {category.name}
+    </span>
+  );
+}
+
+// A large amount with its currency symbol set small, as Copilot does.
+export function Figure({ text }: { text: string }) {
+  const [, sign, lead, digits, trail] = text.match(/^([+−-]?)(\D*)(.*?)(\D*)$/) ?? ["", "", "", text, ""];
+  return (
+    <>
+      {sign}
+      {lead && <span className="figure-sym">{lead}</span>}
+      {digits}
+      {trail && <span className="figure-sym">{trail}</span>}
+    </>
+  );
+}
+
+// A category's name in its own colour, for rows that list categories.
+export function CategoryName({ name, color, className = "" }: { name: string; color?: string; className?: string }) {
+  return (
+    <span className={`category-name ${className}`} style={{ "--c": color } as CSSProperties}>
+      {name}
     </span>
   );
 }
@@ -63,7 +86,7 @@ export function Ring({ spent, budget, color }: { spent: number; budget: number; 
         transform="rotate(-90 29 29)"
         style={{ transition: "stroke-dasharray 700ms cubic-bezier(0.32,0.72,0,1)" }}
       />
-      <text x="29" y="33.5" textAnchor="middle" fontFamily="Inter" fontSize="13" fontWeight="700" fill={share > 1 ? "var(--over)" : "var(--ink)"} style={{ fontVariantNumeric: "tabular-nums" }}>
+      <text x="29" y="33.5" textAnchor="middle" fontFamily="var(--font)" fontSize="13" fontWeight="700" fill={share > 1 ? "var(--over)" : "var(--ink)"} style={{ fontVariantNumeric: "tabular-nums" }}>
         {Math.round(share * 100)}%
       </text>
     </svg>
@@ -80,7 +103,7 @@ export function PaceChart({ points, total, width = 322, height = 96 }: { points:
   const y = (v: number) => height - 4 - (v / max) * (height - 10);
   const path = points.map((p, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)} ${y(p.actual).toFixed(1)}`).join(" ");
   const last = points[points.length - 1];
-  const tone = last.actual > last.ideal ? "var(--over)" : "var(--brand)";
+  const tone = last.actual > last.ideal ? "var(--over)" : "var(--good)";
   return (
     <svg width="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ height, overflow: "visible" }} aria-hidden>
       <path d={`M0 ${y(0)} L${width} ${y(total)}`} stroke="var(--ink-4)" strokeWidth="1.5" strokeDasharray="4 5" fill="none" vectorEffect="non-scaling-stroke" />
@@ -90,7 +113,9 @@ export function PaceChart({ points, total, width = 322, height = 96 }: { points:
   );
 }
 
-export function LineChart({ values, height = 80, color = "var(--brand)", fill }: { values: number[]; height?: number; color?: string; fill?: string }) {
+// With area, the line's own colour fades to nothing under it.
+export function LineChart({ values, height = 80, color = "var(--brand)", area = false }: { values: number[]; height?: number; color?: string; area?: boolean }) {
+  const gradient = useId();
   const width = 320;
   if (values.length < 2) return <div style={{ height }} />;
   const min = Math.min(...values);
@@ -100,14 +125,24 @@ export function LineChart({ values, height = 80, color = "var(--brand)", fill }:
   const d = pts.map(([px, py], i) => `${i ? "L" : "M"}${px.toFixed(1)} ${py.toFixed(1)}`).join(" ");
   return (
     <svg width="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ height }} aria-hidden>
-      {fill && <path d={`${d} L${width} ${height} L0 ${height} Z`} fill={fill} />}
+      {area && (
+        <>
+          <defs>
+            <linearGradient id={gradient} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor={color} stopOpacity="0.24" />
+              <stop offset="1" stopColor={color} stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <path d={`${d} L${width} ${height} L0 ${height} Z`} fill={`url(#${gradient})`} />
+        </>
+      )}
       <path d={d} stroke={color} strokeWidth="2.5" fill="none" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
     </svg>
   );
 }
 
 // Months as bars against a reference line. Past months stay neutral; the
-// current one carries the brand, or red when it is over the line.
+// current one is green, or red when it is over the line.
 export function Bars({ values, normal, height = 110 }: { values: number[]; normal?: number; height?: number }) {
   const max = Math.max(normal ?? 0, ...values, 1) * 1.1;
   return (
@@ -121,7 +156,7 @@ export function Bars({ values, normal, height = 110 }: { values: number[]; norma
             style={{
               flex: 1,
               height: v > 0 ? Math.max(4, (v / max) * height) : 2,
-              background: last ? (over ? "var(--over)" : "var(--brand)") : "var(--bar)",
+              background: last ? (over ? "var(--over)" : "var(--good)") : "var(--bar)",
               borderRadius: 5,
               transition: "height 600ms cubic-bezier(0.32,0.72,0,1)",
             }}

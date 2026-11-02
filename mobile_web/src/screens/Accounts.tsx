@@ -3,7 +3,7 @@ import { useParams } from "@tanstack/react-router";
 import { useState } from "react";
 import { PushedScreen } from "../components/Screen";
 import { Sheet } from "../components/Sheet";
-import { Empty, ErrorBlock, LineChart, Section, Skeleton, toast } from "../components/ui";
+import { Empty, ErrorBlock, Figure, LineChart, Section, Skeleton, toast } from "../components/ui";
 import { api } from "../lib/api";
 import { decimalToCents, initials, isoDate, LOCALE, money } from "../lib/format";
 import { closeSheet, go, openSheet } from "../lib/nav";
@@ -50,7 +50,7 @@ export function Accounts() {
           <ErrorBlock what="your net worth" onRetry={() => sheet.refetch()} />
         ) : sheet.data ? (
           <>
-            <span className="display lead-figure">{money(last, currency, { cents: false })}</span>
+            <span className="display lead-figure"><Figure text={money(last, currency, { cents: false })} /></span>
             <span className="lead-sub">
               {points.length > 1 && Math.abs(change) >= 0.05 ? (
                 <b style={{ color: change > 0 ? "var(--good-ink)" : "var(--over)" }}>
@@ -76,7 +76,7 @@ export function Accounts() {
           </>
         )}
         <div style={{ opacity: series.isPlaceholderData ? 0.5 : 1, transition: "opacity 160ms" }}>
-          {series.isError ? <ErrorBlock what="the chart" onRetry={() => series.refetch()} /> : <LineChart values={points.map((p) => p.net_worth_cents)} fill="var(--brand-tint)" />}
+          {series.isError ? <ErrorBlock what="the chart" onRetry={() => series.refetch()} /> : <LineChart values={points.map((p) => p.net_worth_cents)} color={trend(points.map((p) => p.net_worth_cents))} area />}
         </div>
         <div className="seg" role="radiogroup" aria-label="Period">
           {PERIODS.map(([key, text]) => (
@@ -201,7 +201,7 @@ export function AccountSheet({ id, open, onExited }: { id: string; open: boolean
             <span className="review-name" style={{ fontSize: 22 }}>
               {a.name}
             </span>
-            <span className="display txn-amount">{money(a.balance_cents, a.currency)}</span>
+            <span className="display txn-amount"><Figure text={money(a.balance_cents, a.currency)} /></span>
             <span className="lead-sub">
               {values.length > 1 && change !== 0 ? (
                 // A falling debt is good news.
@@ -213,7 +213,7 @@ export function AccountSheet({ id, open, onExited }: { id: string; open: boolean
               )}
             </span>
           </div>
-          <LineChart values={values} fill="var(--brand-tint)" height={96} />
+          <LineChart values={values} color={trend(values)} area height={96} />
           <div className="sheet-actions">
             <button className="btn soft pressable" style={{ flex: 1 }} onClick={() => (a.account_type === "investment" ? open_(`/accounts/${id}/holdings`) : open_("/transactions", { in: id }))}>
               {a.account_type === "investment" ? "Holdings" : "Transactions"}
@@ -239,7 +239,7 @@ export function Holdings() {
     <PushedScreen id={`holdings-${id}`} title={account.data?.name ?? "Holdings"} fallback="/accounts">
       <div className="card pad lead">
         <span className="label">Value</span>
-        {account.data ? <span className="display lead-figure">{money(account.data.balance_cents, account.data.currency, { cents: false })}</span> : <Skeleton height={38} width="50%" />}
+        {account.data ? <span className="display lead-figure"><Figure text={money(account.data.balance_cents, account.data.currency, { cents: false })} /></span> : <Skeleton height={38} width="50%" />}
       </div>
       <Section title="Holdings">
         <div className="card list">
@@ -269,4 +269,9 @@ export function Holdings() {
       </Section>
     </PushedScreen>
   );
+}
+
+// Up is green and down is red, as on the investments chart.
+function trend(values: number[]) {
+  return (values.at(-1) ?? 0) < (values[0] ?? 0) ? "var(--over)" : "var(--good)";
 }

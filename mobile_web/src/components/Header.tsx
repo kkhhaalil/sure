@@ -15,8 +15,15 @@ export const TABS = [
 export function Header({ active }: { active: string }) {
   const tabsRef = useRef<HTMLDivElement>(null);
 
+  // Centre the active tab in the rail: at once when the header mounts on a
+  // tab further right, smoothly when the tab changes.
+  const mounted = useRef(false);
   useEffect(() => {
-    tabsRef.current?.querySelector<HTMLElement>("[aria-selected=true]")?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+    const rail = tabsRef.current;
+    const tab = rail?.querySelector<HTMLElement>("[aria-selected=true]");
+    if (!rail || !tab) return;
+    rail.scrollTo({ left: tab.offsetLeft - (rail.clientWidth - tab.offsetWidth) / 2, behavior: mounted.current ? "smooth" : "instant" });
+    mounted.current = true;
   }, [active]);
 
   return (

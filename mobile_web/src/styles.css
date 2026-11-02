@@ -1,35 +1,41 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter+Tight:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,500;6..12,600;6..12,700&family=JetBrains+Mono:wght@500;600&display=swap");
 
-/* Alpine: snow ground, evergreen brand, signal red / sunlit amber / meadow green for budget state. */
+/* Copilot-style sky: a blue header that fades into a cool grey page, white
+   cards, green and red for budget state. Avenir Next ships on Apple devices;
+   Nunito Sans stands in elsewhere. */
 :root {
-  --ground: #f2f5f3;
+  --ground: #f2f5fa;
   --surface: #ffffff;
-  --surface-sunk: #eaefec;
-  --line: #e3e9e6;
-  --bar: #d9e2dd;
-  --ink: #0f1a16;
-  --ink-2: #44534c;
-  --ink-3: #5f6e67;
-  --ink-4: #95a29b;
-  --brand: #0e5a44;
-  --brand-deep: #0b4b38;
-  --brand-tint: #e1ede7;
+  --surface-sunk: #eef1f6;
+  --line: #e8edf5;
+  --bar: #dce3ef;
+  --ink: #14254a;
+  --ink-2: #4e5d7c;
+  --ink-3: #66748f;
+  --ink-4: #9aa7c0;
+  --brand: #1d5ce0;
+  --brand-fill: #1d5ce0;
+  --brand-deep: #1d5ce0;
+  --brand-tint: #eef3fd;
+  --sky-1: #3f7beb;
+  --sky-2: #a9c3f5;
   --on-brand: #ffffff;
-  --on-brand-2: rgb(255 255 255 / 0.74);
-  --over: #d63f33;
-  --over-tint: #fbe4e1;
-  --warn: #e6a13a;
+  --on-brand-2: rgb(255 255 255 / 0.8);
+  --over: #d23b30;
+  --over-tint: #fdecea;
+  --warn: #e8a33a;
   --warn-ink: #8f5d12;
-  --warn-tint: #fbefd9;
-  --good: #2e9c5a;
-  --good-ink: #23794a;
-  --good-tint: #e3f3e9;
-  --toast-action: #7fd4a4;
-  --scrim: rgb(8 20 15 / 0.42);
-  --shadow-lift: 0 12px 32px rgb(15 26 22 / 0.12);
-  --radius-card: 20px;
-  --font: "Inter", system-ui, -apple-system, sans-serif;
-  --display: "Inter Tight", "Inter", system-ui, sans-serif;
+  --warn-tint: #fff1e6;
+  --good: #1fa45a;
+  --good-ink: #16804a;
+  --good-tint: #e6f6ec;
+  --toast-action: #8fb1f3;
+  --scrim: rgb(10 22 50 / 0.45);
+  --shadow-card: 0 8px 24px rgb(20 37 74 / 0.06);
+  --shadow-lift: 0 16px 36px rgb(20 37 74 / 0.12);
+  --radius-card: 22px;
+  --font: "Avenir Next", "Nunito Sans", system-ui, -apple-system, sans-serif;
+  --display: var(--font);
   --mono: "JetBrains Mono", ui-monospace, monospace;
   --spring: cubic-bezier(0.32, 0.72, 0, 1);
   --safe-top: env(safe-area-inset-top, 0px);
@@ -37,31 +43,38 @@
   color-scheme: light;
 }
 
+/* Night sky: the header deepens, cards sit one step above a near-black page,
+   and accents are raised so text on them still reads at 4.5:1. Fills behind
+   white text use --brand-fill, which stays darker than the --brand links. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --ground: #0b110e;
-    --surface: #141c18;
-    --surface-sunk: #1c2621;
-    --line: #233029;
-    --bar: #2a3731;
-    --ink: #eef3f0;
-    --ink-2: #b9c5bf;
-    --ink-3: #93a19a;
-    --ink-4: #66736c;
-    --brand: #3fae86;
-    --brand-deep: #0a3a2c;
-    --brand-tint: #16302a;
+    --ground: #0a0f1c;
+    --surface: #141b2b;
+    --surface-sunk: #1c2538;
+    --line: #222b3d;
+    --bar: #2a3550;
+    --ink: #edf1f8;
+    --ink-2: #aeb9cf;
+    --ink-3: #8e9bb5;
+    --ink-4: #5c6a87;
+    --brand: #6e9bff;
+    --brand-fill: #3070f0;
+    --brand-deep: #1e46a8;
+    --brand-tint: #18264a;
+    --sky-1: #1a3478;
+    --sky-2: #121f44;
     --over: #ff6b5e;
-    --over-tint: #3a1c19;
+    --over-tint: #3a1a1c;
     --warn: #f0b354;
     --warn-ink: #f0b354;
-    --warn-tint: #352a16;
-    --good: #4cc27c;
-    --good-ink: #6fd69a;
-    --good-tint: #15301f;
-    --toast-action: #0e5a44;
+    --warn-tint: #3a2414;
+    --good: #2fc27a;
+    --good-ink: #52d394;
+    --good-tint: #10301f;
+    --toast-action: #1d5ce0;
     --scrim: rgb(0 0 0 / 0.6);
-    --shadow-lift: 0 12px 32px rgb(0 0 0 / 0.45);
+    --shadow-card: none;
+    --shadow-lift: 0 16px 36px rgb(0 0 0 / 0.5);
     color-scheme: dark;
   }
 }
@@ -71,7 +84,7 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-/* The page ground under the status bar is evergreen: iOS fades the top edge
+/* The page ground under the status bar is the sky: iOS fades the top edge
    with it and picks the status bar text colour from it, so it matches the
    header. Screens paint their own ground (.app). */
 html,
@@ -209,6 +222,9 @@ select {
   background: var(--brand-deep);
   color: var(--on-brand);
 }
+.header.pushed {
+  background: linear-gradient(180deg, var(--brand-deep), var(--sky-1));
+}
 .header-bar {
   display: flex;
   align-items: center;
@@ -219,16 +235,16 @@ select {
 }
 .wordmark {
   font-family: var(--display);
-  font-weight: 800;
-  font-size: 23px;
-  letter-spacing: -0.03em;
+  font-weight: 700;
+  font-size: 26px;
+  letter-spacing: -0.02em;
 }
 .bar-title {
   flex: 1;
   min-width: 0;
   text-align: center;
-  font-size: 17px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -283,13 +299,16 @@ select {
     opacity: 0;
   }
 }
+/* The rail fades out at its edges so a clipped tab reads as "scroll for
+   more", not as a layout bug. */
 .tabs {
   display: flex;
-  gap: 4px;
-  padding: 0 12px 12px;
+  gap: 2px;
+  padding: 2px 32px 10px 12px;
   overflow-x: auto;
   scrollbar-width: none;
   scroll-snap-type: x proximity;
+  mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 40px), transparent);
 }
 .tabs::-webkit-scrollbar {
   display: none;
@@ -297,7 +316,7 @@ select {
 .tab {
   flex-shrink: 0;
   height: 34px;
-  padding: 0 13px;
+  padding: 0 14px;
   border-radius: 17px;
   font-size: 15px;
   font-weight: 500;
@@ -306,9 +325,20 @@ select {
   transition: background 220ms var(--spring), color 220ms;
 }
 .tab[aria-selected="true"] {
-  background: var(--on-brand);
-  color: var(--brand-deep);
+  background: rgb(255 255 255 / 0.2);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.42);
+  color: var(--on-brand);
   font-weight: 600;
+}
+
+/* On the tab screens the sky keeps falling behind the first cards and
+   scrolls away with them. */
+.scroller.sky {
+  background: linear-gradient(180deg, var(--brand-deep) 0, var(--sky-1) 110px, var(--sky-2) 240px, var(--ground) 400px) no-repeat local, var(--ground);
+}
+/* A list starts right under the search, so its sky ends there too. */
+.scroller.sky.short {
+  background: linear-gradient(180deg, var(--brand-deep) 0, var(--sky-1) 48px, var(--ground) 132px) no-repeat local, var(--ground);
 }
 
 .footer {
@@ -336,6 +366,11 @@ select {
 .card {
   background: var(--surface);
   border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+.card.lead {
+  border-radius: 26px;
+  box-shadow: var(--shadow-lift);
 }
 .card.pad {
   padding: 18px;
@@ -357,14 +392,24 @@ select {
 .section-head {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   gap: 12px;
-  padding: 0 4px;
+  min-height: 24px;
+  padding: 0 6px;
 }
 .section-head h2 {
-  font-size: 19px;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.section-head .link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 14px;
+  min-height: 44px;
+  margin: -10px 0;
 }
 .section-total {
   font-size: 15px;
@@ -390,9 +435,9 @@ select {
 
 .display {
   font-family: var(--display);
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 1.05;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.08;
   font-variant-numeric: tabular-nums;
 }
 .muted {
@@ -420,7 +465,13 @@ select {
   width: 100%;
 }
 .lead-figure {
-  font-size: 40px;
+  font-size: 38px;
+}
+.figure-sym {
+  font-size: 0.5em;
+  letter-spacing: 0;
+  vertical-align: 0.55em;
+  padding-right: 0.04em;
 }
 .lead-unit {
   font-family: var(--font);
@@ -566,29 +617,43 @@ select {
   color: var(--good-ink);
 }
 
-/* Category chip: neutral pill, the category's colour on a dot. */
+/* Category chip: the category's colour as a tint, its name in that colour
+   pulled toward the ink so it reads on either theme. On a transaction a
+   category is always this chip; on a category row it is a coloured name. */
 .chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 26px;
-  font-size: 13px;
-  font-weight: 500;
-  padding: 0 10px 0 8px;
-  border-radius: 13px;
+  --c: var(--ink-4);
+  display: inline-block;
+  height: 24px;
+  line-height: 24px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0 9px;
+  border-radius: 12px;
   white-space: nowrap;
-  max-width: 132px;
+  max-width: 112px;
   overflow: hidden;
   text-overflow: ellipsis;
-  background: var(--surface-sunk);
-  color: var(--ink-2);
+  background: color-mix(in srgb, var(--c) 15%, var(--surface));
+  color: color-mix(in srgb, var(--c) 72%, var(--ink));
   flex-shrink: 0;
 }
 .chip.empty {
-  padding: 0 10px;
   background: transparent;
   box-shadow: inset 0 0 0 1.5px var(--bar);
   color: var(--ink-3);
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+.field-value .chip {
+  max-width: 190px;
+}
+.category-name {
+  color: color-mix(in srgb, var(--c, var(--ink-4)) 72%, var(--ink));
+  font-weight: 600;
 }
 
 .row {
@@ -666,10 +731,14 @@ select {
   gap: 14px;
 }
 .ticker {
-  font-family: var(--mono);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
   width: 56px;
+  padding: 3px 0;
+  border-radius: 7px;
+  background: var(--surface-sunk);
   flex-shrink: 0;
 }
 .date-tile {
@@ -718,12 +787,9 @@ select {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.btn.primary {
-  background: var(--ink);
-  color: var(--surface);
-}
+.btn.primary,
 .btn.brand {
-  background: var(--brand);
+  background: var(--brand-fill);
   color: #fff;
 }
 .btn.soft {
@@ -853,7 +919,7 @@ select {
 }
 .seg button {
   flex: 1;
-  height: 32px;
+  height: 36px;
   font-size: 14px;
   font-weight: 500;
   color: var(--ink-2);
@@ -863,7 +929,12 @@ select {
   background: var(--surface);
   color: var(--ink);
   font-weight: 600;
-  box-shadow: 0 1px 2px rgb(15 26 22 / 0.08);
+  box-shadow: 0 1px 3px rgb(20 37 74 / 0.1);
+}
+.card .seg button[aria-pressed="true"] {
+  background: var(--brand-tint);
+  color: var(--brand);
+  box-shadow: none;
 }
 .seg.wide button {
   height: 38px;
@@ -889,7 +960,7 @@ select {
   transition: transform 260ms var(--spring);
 }
 .toggle[aria-checked="true"] {
-  background: var(--brand);
+  background: var(--brand-fill);
 }
 .toggle[aria-checked="true"] span {
   transform: translateX(20px);
@@ -909,7 +980,7 @@ select {
   transition: background 160ms;
 }
 .check.on {
-  background: var(--brand);
+  background: var(--brand-fill);
   box-shadow: none;
 }
 
@@ -1068,7 +1139,7 @@ select {
 .progress span {
   display: block;
   height: 100%;
-  background: var(--brand);
+  background: var(--brand-fill);
   transform-origin: left;
   transition: transform 400ms var(--spring);
 }
@@ -1086,7 +1157,7 @@ select {
 }
 .review-card {
   position: relative;
-  border-radius: 26px;
+  border-radius: 28px;
   padding: 26px 20px 20px;
   display: flex;
   flex-direction: column;
@@ -1139,7 +1210,7 @@ select {
   background: var(--surface-sunk);
 }
 .choice[aria-pressed="true"] {
-  background: var(--brand);
+  background: var(--brand-fill);
   color: #fff;
   font-weight: 600;
 }
@@ -1165,8 +1236,8 @@ select {
 
 /* ---------- Assistant ---------- */
 .insight {
-  background: var(--brand);
-  color: #fff;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
   border-radius: var(--radius-card);
   padding: 18px;
   display: flex;
@@ -1174,8 +1245,11 @@ select {
   gap: 6px;
 }
 .insight-kicker {
-  font-size: 14px;
-  color: var(--on-brand-2);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand);
 }
 .insight-title {
   font-size: 18px;
@@ -1185,16 +1259,14 @@ select {
 .insight-body {
   font-size: 15px;
   line-height: 1.45;
-  color: rgb(255 255 255 / 0.88);
+  color: var(--ink-2);
 }
 .insight button {
   align-self: flex-start;
   font-size: 15px;
   font-weight: 600;
   padding-top: 8px;
-  color: #fff;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  color: var(--brand);
 }
 .starters {
   display: flex;
@@ -1206,7 +1278,9 @@ select {
   padding: 10px 14px;
   border-radius: 16px;
   font-size: 15px;
+  font-weight: 600;
   text-align: left;
+  color: var(--brand);
   background: var(--surface);
 }
 .thread {
@@ -1223,14 +1297,14 @@ select {
 }
 .bubble.mine {
   align-self: flex-end;
-  background: var(--ink);
-  color: var(--surface);
-  border-radius: 18px 18px 4px 18px;
+  background: var(--brand-fill);
+  color: #fff;
+  border-radius: 20px 20px 6px 20px;
 }
 .bubble.theirs {
   align-self: flex-start;
   background: var(--surface);
-  border-radius: 18px 18px 18px 4px;
+  border-radius: 20px 20px 20px 6px;
 }
 .tools {
   display: flex;
@@ -1278,6 +1352,7 @@ select {
   height: 52px;
   border-radius: 26px;
   background: var(--surface);
+  box-shadow: var(--shadow-card);
   display: flex;
   align-items: center;
   padding: 0 6px 0 18px;
@@ -1294,7 +1369,7 @@ select {
   width: 40px;
   height: 40px;
   border-radius: 20px;
-  background: var(--brand);
+  background: var(--brand-fill);
   color: #fff;
   display: grid;
   place-items: center;
@@ -1306,7 +1381,7 @@ select {
 /* ---------- Onboarding ---------- */
 .hero {
   flex-shrink: 0;
-  background: var(--brand-deep);
+  background: linear-gradient(180deg, var(--brand-deep), var(--sky-1));
   color: #fff;
   padding: calc(var(--safe-top) + 36px) 24px 28px;
   display: flex;
@@ -1325,11 +1400,11 @@ select {
   height: 52px;
   border-radius: 15px;
   background: #fff;
-  color: var(--brand-deep);
+  color: #1d5ce0;
   display: grid;
   place-items: center;
   font-family: var(--display);
-  font-weight: 800;
+  font-weight: 700;
   font-size: 28px;
   letter-spacing: -0.04em;
   margin-bottom: 8px;
@@ -1415,8 +1490,8 @@ select {
   width: 56px;
   height: 56px;
   border-radius: 28px;
-  background: var(--ink);
-  color: var(--surface);
+  background: var(--brand-fill);
+  color: #fff;
   display: grid;
   place-items: center;
   box-shadow: var(--shadow-lift);

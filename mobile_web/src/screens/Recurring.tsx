@@ -1,4 +1,4 @@
-import { ErrorBlock, Section, Skeleton } from "../components/ui";
+import { ErrorBlock, Figure, Section, Skeleton } from "../components/ui";
 import { isoDate, money, monthName, parseDate, shortMonth, today } from "../lib/format";
 import { useApi } from "../lib/query";
 import type { Recurring as RecurringItem } from "../lib/types";
@@ -37,7 +37,7 @@ export function Recurring() {
           </>
         ) : (
           <>
-            <span className="display lead-figure">{money(leftToPay, currency, { cents: false })}</span>
+            <span className="display lead-figure"><Figure text={money(leftToPay, currency, { cents: false })} /></span>
             <span className="lead-sub">
               {thisMonth.length === 0 ? "Nothing else due this month" : `${thisMonth.length} ${thisMonth.length === 1 ? "bill" : "bills"} still due this month`}
             </span>

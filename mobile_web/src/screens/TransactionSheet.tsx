@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Check, ChevronRight, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Sheet } from "../components/Sheet";
-import { CategoryChip, Dot, Empty, ErrorBlock, Skeleton, Toggle, toast } from "../components/ui";
+import { CategoryChip, CategoryName, Dot, Empty, ErrorBlock, Figure, Skeleton, Toggle, toast } from "../components/ui";
 import { api } from "../lib/api";
 import { dayLabel, money } from "../lib/format";
 import { closeSheet, openSheet, openSheets } from "../lib/nav";
@@ -59,7 +59,7 @@ export function TransactionSheet({ id, open, onExited }: SheetProps) {
             </span>
             <span className="display txn-amount" style={{ color: income ? "var(--good-ink)" : undefined }}>
               {income ? "+" : ""}
-              {money(t.amount_cents, t.currency)}
+              <Figure text={money(t.amount_cents, t.currency)} />
             </span>
             <span className="review-name">{t.merchant?.name ?? t.name}</span>
             <span className={`status${t.reviewed_at ? " done" : ""}`}>{t.reviewed_at ? "Reviewed" : "Not reviewed yet"}</span>
@@ -201,9 +201,7 @@ export function CategoryPicker({ id, open, onExited }: SheetProps) {
             return (
               <button key={c.id} className="row pressable" aria-pressed={selected} onClick={() => choose(c)}>
                 <Dot color={c.color} size={12} />
-                <span className="grow name" style={{ fontWeight: selected ? 600 : 500 }}>
-                  {c.name}
-                </span>
+                <CategoryName name={c.name} color={c.color} className="grow name" />
                 {left !== undefined && env!.budgeted_spending_cents > 0 && (
                   <span className="num" style={{ fontSize: 14, color: left < 0 ? "var(--over)" : "var(--ink-3)" }}>
                     {money(Math.abs(left), env!.currency, { cents: false })} {left < 0 ? "over" : "left"}

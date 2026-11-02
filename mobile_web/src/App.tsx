@@ -135,7 +135,7 @@ function TabShell() {
   return (
     <div className="app">
       <Header active={active} />
-      <Scroller id={active} key={active}>
+      <Scroller id={active} key={active} sky={active === "/transactions" ? "short" : "long"}>
         <Outlet />
       </Scroller>
     </div>

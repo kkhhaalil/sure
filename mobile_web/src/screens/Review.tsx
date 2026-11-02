@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { PushedScreen } from "../components/Screen";
-import { ErrorBlock, Skeleton, toast } from "../components/ui";
+import { ErrorBlock, Figure, Skeleton, toast } from "../components/ui";
 import { dayLabel, money } from "../lib/format";
 import { go, openSheet } from "../lib/nav";
 import { useApi } from "../lib/query";
@@ -132,7 +132,7 @@ export function Review() {
             </span>
             <span className="display review-amount" style={{ color: current.classification === "income" ? "var(--good-ink)" : undefined }}>
               {current.classification === "income" ? "+" : ""}
-              {money(current.amount_cents, current.currency)}
+              <Figure text={money(current.amount_cents, current.currency)} />
             </span>
             <span className="review-name">{current.merchant?.name ?? current.name}</span>
             {current.merchant && current.merchant.name !== current.name && <span className="review-desc">{current.name}</span>}

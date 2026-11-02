@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { useState } from "react";
 import { PushedScreen } from "../components/Screen";
-import { Bars, Dot, Empty, ErrorBlock, Section, Skeleton, Toggle, toast } from "../components/ui";
+import { Bars, CategoryName, Dot, Empty, ErrorBlock, Figure, Section, Skeleton, Toggle, toast } from "../components/ui";
 import { api } from "../lib/api";
 import { decimalToCents, isoDate, money, monthName, today } from "../lib/format";
 import { go } from "../lib/nav";
@@ -40,7 +40,7 @@ export function Spending() {
           <ErrorBlock what="spending by month" onRetry={() => series.refetch()} />
         ) : series.data ? (
           <>
-            <span className="display lead-figure">{money(thisMonth, currency, { cents: false })}</span>
+            <span className="display lead-figure"><Figure text={money(thisMonth, currency, { cents: false })} /></span>
             <span className="lead-sub">
               {change === null ? (
                 "Not enough history to compare yet"
@@ -87,7 +87,7 @@ export function Spending() {
             return (
               <Row key={row.id} className={`row${env ? " pressable" : ""}`} onClick={env ? () => go(`/categories/${env.id}`, { push: true }) : undefined}>
                 <Dot color={row.color} />
-                <span className="grow name">{row.name}</span>
+                <CategoryName name={row.name} color={row.color} className="grow name" />
                 <span className="num delta" style={{ color: row.change === null || delta === 0 ? "var(--ink-4)" : delta > 0 ? "var(--over)" : "var(--good-ink)" }}>
                   {row.change === null ? "new" : delta === 0 ? "—" : `${delta > 0 ? "+" : "−"}${money(Math.abs(delta), currency, { cents: false })}`}
                 </span>
@@ -141,7 +141,7 @@ export function CategoryDetail() {
         <>
           <div className="card pad lead">
             <span className="label">Spent in {monthName(isoDate(today()))}</span>
-            <span className="display lead-figure">{money(data.actual_spending_cents, currency, { cents: false })}</span>
+            <span className="display lead-figure"><Figure text={money(data.actual_spending_cents, currency, { cents: false })} /></span>
             <span className="lead-sub">
               {data.budgeted_spending_cents > 0 ? (
                 <b style={{ color: left < 0 ? "var(--over)" : "var(--good-ink)" }}>

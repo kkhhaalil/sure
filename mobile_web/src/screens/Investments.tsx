@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Empty, ErrorBlock, LineChart, Skeleton } from "../components/ui";
+import { Empty, ErrorBlock, Figure, LineChart, Skeleton } from "../components/ui";
 import { initials, money } from "../lib/format";
 import { openSheet } from "../lib/nav";
 import { useApi } from "../lib/query";
@@ -57,7 +57,7 @@ export function Investments() {
         {data ? (
           <>
             <Change percent={data.change_percent} />
-            <span className="display lead-figure">{money(data.total_cents, currency, { cents: false })}</span>
+            <span className="display lead-figure"><Figure text={money(data.total_cents, currency, { cents: false })} /></span>
             <span className="lead-sub">
               {data.change_cents === 0 ? `No change ${span}` : `${data.change_cents > 0 ? "+" : "−"}${money(Math.abs(data.change_cents), currency, { cents: false })} ${span}`}
             </span>
@@ -74,7 +74,7 @@ export function Investments() {
             values={(data?.series ?? []).map((p) => p.value_cents)}
             height={96}
             color={(data?.change_cents ?? 0) < 0 ? "var(--over)" : "var(--good)"}
-            fill={(data?.change_cents ?? 0) < 0 ? "var(--over-tint)" : "var(--good-tint)"}
+            area
           />
         </div>
         <div className="seg" role="radiogroup" aria-label="Period">

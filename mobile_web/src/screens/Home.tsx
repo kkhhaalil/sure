@@ -1,4 +1,4 @@
-import { CategoryChip, Empty, ErrorBlock, PaceChart, Ring, Section, Skeleton, Stat, toast } from "../components/ui";
+import { CategoryChip, Empty, ErrorBlock, Figure, PaceChart, Ring, Section, Skeleton, Stat, toast } from "../components/ui";
 import { decimalToCents, inDays, isoDate, money, monthName, today } from "../lib/format";
 import { go, openSheet } from "../lib/nav";
 import { useApi } from "../lib/query";
@@ -51,7 +51,7 @@ export function Home() {
           <>
             <span className="label">{month} budget</span>
             <span className="display lead-figure">
-              {money(Math.abs(left), currency, { cents: false })} <span className="lead-unit">{left >= 0 ? "left" : "over"}</span>
+              <Figure text={money(Math.abs(left), currency, { cents: false })} /> <span className="lead-unit">{left >= 0 ? "left" : "over"}</span>
             </span>
             <span className="lead-sub">
               of {money(budgeted, currency, { cents: false })} budgeted
