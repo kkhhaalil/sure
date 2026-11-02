@@ -14,6 +14,7 @@ integration.
 | --- | --- | --- | --- |
 | Web app | Full everyday use, administration, and self-hosted access from any modern browser. | Primary client | Run the Rails app and visit the server URL. For local development, use `bin/dev` and open `http://localhost:3000`. |
 | macOS desktop app | People who want Sure in a native Mac window with system app chrome and deep-link handling. | Native shell around the web app | See [Sure Desktop](../desktop/README.md). |
+| Mobile web app | Daily check-ins on a phone: review transactions, budgets, spending, accounts and the assistant. Installs to the Home Screen; no app store. | Installable PWA served at `/m` | See [Mobile web app](hosting/mobile-web.md). |
 | Mobile app | Basic mobile access on iOS and Android, currently focused on login and account balances. | Flutter companion app | See [Sure Mobile](../mobile/README.md). |
 | LLM agents and assistants | Claude Desktop, GPT agents, local agents, or custom tools that need structured access to Sure data. | MCP endpoint for external AI clients | See [MCP Server for External AI Assistants](hosting/mcp.md). |
 | Custom API clients | Scripts, services, importer experiments, dashboards, or other integrations. | HTTP API | See the OpenAPI spec at [docs/api/openapi.yaml](api/openapi.yaml) and endpoint guides such as [docs/api/transactions.md](api/transactions.md). |

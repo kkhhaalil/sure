@@ -43,3 +43,7 @@
 # Ignore Docker-related files
 /.dockerignore
 /Dockerfile*
+
+# The mobile web app is built inside the image (see the mobile_web stage).
+/mobile_web/node_modules
+/public/m-app

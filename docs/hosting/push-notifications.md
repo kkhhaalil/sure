@@ -1,5 +1,8 @@
 # Hosted iOS push notifications
 
+For self-hosted servers, the [mobile web app](mobile-web.md) supports Web Push,
+which needs only VAPID keys.
+
 Native push notifications are supported only in hosted mode, which Rails calls
 `managed`. `SELF_HOSTED=true` or `SELF_HOSTING_ENABLED=true` disables registration,
 unregistration, diagnostic controls, and APNs delivery. Existing tokens and
