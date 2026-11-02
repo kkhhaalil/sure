@@ -183,17 +183,21 @@ export function Toggle({ on, onChange, label, disabled }: { on: boolean; onChang
 }
 
 let toastTimer: number | undefined;
-const toastListeners = new Set<(toast: { message: string; id: number } | null) => void>();
+type ToastAction = { label: string; run: () => void };
+type CurrentToast = { message: string; id: number; action?: ToastAction };
+const toastListeners = new Set<(toast: CurrentToast | null) => void>();
+const dismissToast = () => toastListeners.forEach((fn) => fn(null));
 
-export function toast(message: string) {
+// A toast with an action stays long enough to reach for it.
+export function toast(message: string, action?: ToastAction) {
   const id = Date.now();
-  toastListeners.forEach((fn) => fn({ message, id }));
+  toastListeners.forEach((fn) => fn({ message, id, action }));
   window.clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => toastListeners.forEach((fn) => fn(null)), 2400);
+  toastTimer = window.setTimeout(dismissToast, action ? 6000 : 2400);
 }
 
 export function Toaster() {
-  const [current, setCurrent] = useState<{ message: string; id: number } | null>(null);
+  const [current, setCurrent] = useState<CurrentToast | null>(null);
   useEffect(() => {
     toastListeners.add(setCurrent);
     return () => {
@@ -205,6 +209,18 @@ export function Toaster() {
       {current && (
         <div key={current.id} className="toast">
           {current.message}
+          {current.action && (
+            <button
+              className="toast-action pressable"
+              onClick={() => {
+                window.clearTimeout(toastTimer);
+                dismissToast();
+                current.action!.run();
+              }}
+            >
+              {current.action.label}
+            </button>
+          )}
         </div>
       )}
     </div>

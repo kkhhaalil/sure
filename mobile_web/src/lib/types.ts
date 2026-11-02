@@ -10,6 +10,7 @@ export type Transaction = {
   date: string;
   amount: string;
   amount_cents: number;
+  amount_decimal: string;
   signed_amount_cents: number;
   currency: string;
   name: string;

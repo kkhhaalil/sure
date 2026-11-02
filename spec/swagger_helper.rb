@@ -777,6 +777,46 @@ RSpec.configure do |config|
               data: { '$ref' => '#/components/schemas/Rule' }
             }
           },
+          RulePreviewResponse: {
+            type: :object,
+            required: %w[data],
+            properties: {
+              data: {
+                type: :object,
+                required: %w[count transactions],
+                properties: {
+                  count: { type: :integer, description: 'How many existing transactions the rule would match' },
+                  transactions: {
+                    type: :array,
+                    description: 'The most recent matches, at most five',
+                    items: {
+                      type: :object,
+                      required: %w[id name date amount_cents currency classification account_name],
+                      properties: {
+                        id: { type: :string, format: :uuid },
+                        name: { type: :string },
+                        merchant_name: { type: :string, nullable: true },
+                        date: { type: :string, format: :date },
+                        amount_cents: { type: :integer },
+                        currency: { type: :string },
+                        classification: { type: :string, enum: %w[income expense] },
+                        account_name: { type: :string },
+                        category: {
+                          type: :object,
+                          nullable: true,
+                          properties: {
+                            id: { type: :string, format: :uuid },
+                            name: { type: :string },
+                            color: { type: :string }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
           RuleCollection: {
             type: :object,
             required: %w[data meta],

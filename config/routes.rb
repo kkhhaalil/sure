@@ -813,6 +813,7 @@ Rails.application.routes.draw do
       resources :rules, only: [ :index, :show, :create, :update, :destroy ] do
         post :apply, on: :member
         post :from_transaction, on: :collection
+        post :preview, on: :collection
       end
       resources :rule_runs, only: [ :index, :show ]
       resources :securities, only: [ :index, :show ]

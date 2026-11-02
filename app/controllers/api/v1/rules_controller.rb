@@ -10,8 +10,9 @@ class Api::V1::RulesController < Api::V1::BaseController
     "0" => false
   }.freeze
   RESOURCE_TYPES = %w[transaction].freeze
+  PREVIEW_LIMIT = 5
 
-  before_action :ensure_read_scope, only: %i[index show]
+  before_action :ensure_read_scope, only: %i[index show preview]
   before_action :ensure_write_scope, only: %i[create update destroy apply from_transaction]
   before_action :set_rule, only: %i[show update destroy apply]
 
@@ -89,6 +90,22 @@ class Api::V1::RulesController < Api::V1::BaseController
     else
       render_validation_error(@rule.errors.full_messages.to_sentence)
     end
+  end
+
+  # What a rule would match before it is saved: the count and the most recent
+  # matches, so a client can show them while the rule is being drafted.
+  def preview
+    rule = current_resource_owner.family.rules.build(rule_params.except(:active))
+    return render_invalid_resource_type_filter unless rule.resource_type.in?(RESOURCE_TYPES)
+
+    scope = rule.matching_resources
+    @count = scope.count
+    @transactions = scope.includes(:category, :merchant, entry: :account)
+      .order("entries.date DESC, entries.created_at DESC")
+      .limit(PREVIEW_LIMIT)
+    render :preview
+  rescue Rule::SafeRegex::TimeoutError
+    render_validation_error("This rule's pattern took too long to check. Simplify it and try again.")
   end
 
   private

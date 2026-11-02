@@ -98,7 +98,7 @@ export function Review() {
       )}
 
       {queue.isSuccess && !current && (
-        <div className="done">
+        <div className="review-done">
           <h2 className="display">{approved > 0 ? `${approved} reviewed` : "All caught up"}</h2>
           <p>{left > 0 ? "You skipped the rest for now. They stay in the queue." : "Nothing new from the last 30 days."}</p>
           <button className="btn primary pressable" onClick={() => go("/", { replace: true })}>

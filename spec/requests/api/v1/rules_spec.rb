@@ -157,4 +157,110 @@ RSpec.describe 'API V1 Rules', type: :request do
       end
     end
   end
+
+  path '/api/v1/rules/preview' do
+    post 'Preview the transactions a rule would match' do
+      tags 'Rules'
+      security [ { apiKeyAuth: [] } ]
+      consumes 'application/json'
+      produces 'application/json'
+      parameter name: :body, in: :body, required: true, schema: {
+        type: :object,
+        required: %w[rule],
+        properties: {
+          rule: {
+            type: :object,
+            required: %w[resource_type],
+            properties: {
+              resource_type: { type: :string, enum: %w[transaction] },
+              effective_date: { type: :string, format: :date, nullable: true },
+              conditions_attributes: {
+                type: :array,
+                items: {
+                  type: :object,
+                  properties: {
+                    condition_type: { type: :string },
+                    operator: { type: :string },
+                    value: { type: :string }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      let(:body) do
+        { rule: { resource_type: 'transaction', conditions_attributes: [ { condition_type: 'transaction_name', operator: 'like', value: 'coffee' } ] } }
+      end
+
+      response '200', 'matches previewed' do
+        schema '$ref' => '#/components/schemas/RulePreviewResponse'
+
+        run_test!
+      end
+
+      response '401', 'unauthorized' do
+        schema '$ref' => '#/components/schemas/ErrorResponse'
+
+        let(:'X-Api-Key') { nil }
+
+        run_test!
+      end
+
+      response '422', 'unsupported resource type' do
+        schema '$ref' => '#/components/schemas/ErrorResponse'
+
+        let(:body) { { rule: { resource_type: 'account' } } }
+
+        run_test!
+      end
+    end
+  end
+
+  path '/api/v1/rules/from_transaction' do
+    post 'Create a categorization rule from a transaction' do
+      tags 'Rules'
+      security [ { apiKeyAuth: [] } ]
+      consumes 'application/json'
+      produces 'application/json'
+      description 'Matches the transaction\'s merchant (or its name when it has none), sets the category, and applies the rule to existing matches in the background.'
+      parameter name: :body, in: :body, required: true, schema: {
+        type: :object,
+        required: %w[transaction_id category_id],
+        properties: {
+          transaction_id: { type: :string, format: :uuid },
+          category_id: { type: :string, format: :uuid }
+        }
+      }
+
+      let(:write_api_key) do
+        key = ApiKey.generate_secure_key
+        ApiKey.create!(user: user, name: 'API Docs Write Key', key: key, scopes: %w[read_write], source: 'mobile')
+      end
+      let(:'X-Api-Key') { write_api_key.plain_key }
+      let(:account) do
+        Account.create!(family: family, name: 'Checking', balance: 0, currency: 'USD', accountable: Depository.create!)
+      end
+      let(:category) { family.categories.create!(name: 'Coffee', color: '#6f4e37') }
+      let(:transaction_record) do
+        account.entries.create!(name: 'BLUE BOTTLE', amount: 6, currency: 'USD', date: Date.current, entryable: Transaction.new).entryable
+      end
+      let(:body) { { transaction_id: transaction_record.id, category_id: category.id } }
+
+      response '201', 'rule created' do
+        schema '$ref' => '#/components/schemas/RuleResponse'
+
+        run_test!
+      end
+
+      response '404', 'transaction or category not found' do
+        schema '$ref' => '#/components/schemas/ErrorResponse'
+
+        let(:body) { { transaction_id: SecureRandom.uuid, category_id: category.id } }
+
+        run_test!
+      end
+    end
+  end
 end

@@ -1373,6 +1373,67 @@ components:
       properties:
         data:
           "$ref": "#/components/schemas/Rule"
+    RulePreviewResponse:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          type: object
+          required:
+          - count
+          - transactions
+          properties:
+            count:
+              type: integer
+              description: How many existing transactions the rule would match
+            transactions:
+              type: array
+              description: The most recent matches, at most five
+              items:
+                type: object
+                required:
+                - id
+                - name
+                - date
+                - amount_cents
+                - currency
+                - classification
+                - account_name
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  name:
+                    type: string
+                  merchant_name:
+                    type: string
+                    nullable: true
+                  date:
+                    type: string
+                    format: date
+                  amount_cents:
+                    type: integer
+                  currency:
+                    type: string
+                  classification:
+                    type: string
+                    enum:
+                    - income
+                    - expense
+                  account_name:
+                    type: string
+                  category:
+                    type: object
+                    nullable: true
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      name:
+                        type: string
+                      color:
+                        type: string
     RuleCollection:
       type: object
       required:
@@ -9163,6 +9224,105 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ErrorResponse"
+  "/api/v1/rules/preview":
+    post:
+      summary: Preview the transactions a rule would match
+      tags:
+      - Rules
+      security:
+      - apiKeyAuth: []
+      parameters: []
+      responses:
+        '200':
+          description: matches previewed
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RulePreviewResponse"
+        '401':
+          description: unauthorized
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+        '422':
+          description: unsupported resource type
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - rule
+              properties:
+                rule:
+                  type: object
+                  required:
+                  - resource_type
+                  properties:
+                    resource_type:
+                      type: string
+                      enum:
+                      - transaction
+                    effective_date:
+                      type: string
+                      format: date
+                      nullable: true
+                    conditions_attributes:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          condition_type:
+                            type: string
+                          operator:
+                            type: string
+                          value:
+                            type: string
+        required: true
+  "/api/v1/rules/from_transaction":
+    post:
+      summary: Create a categorization rule from a transaction
+      tags:
+      - Rules
+      security:
+      - apiKeyAuth: []
+      description: Matches the transaction's merchant (or its name when it has none),
+        sets the category, and applies the rule to existing matches in the background.
+      parameters: []
+      responses:
+        '201':
+          description: rule created
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RuleResponse"
+        '404':
+          description: transaction or category not found
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - transaction_id
+              - category_id
+              properties:
+                transaction_id:
+                  type: string
+                  format: uuid
+                category_id:
+                  type: string
+                  format: uuid
+        required: true
   "/api/v1/securities":
     get:
       summary: List securities referenced by family investment data

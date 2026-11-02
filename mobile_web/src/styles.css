@@ -24,6 +24,7 @@
   --good: #2e9c5a;
   --good-ink: #23794a;
   --good-tint: #e3f3e9;
+  --toast-action: #7fd4a4;
   --scrim: rgb(8 20 15 / 0.42);
   --shadow-lift: 0 12px 32px rgb(15 26 22 / 0.12);
   --radius-card: 20px;
@@ -58,6 +59,7 @@
     --good: #4cc27c;
     --good-ink: #6fd69a;
     --good-tint: #15301f;
+    --toast-action: #0e5a44;
     --scrim: rgb(0 0 0 / 0.6);
     --shadow-lift: 0 12px 32px rgb(0 0 0 / 0.45);
     color-scheme: dark;
@@ -1147,16 +1149,16 @@ select {
   color: var(--ink-3);
   padding-top: 16px;
 }
-.done {
+.review-done {
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 48px 8px 0;
 }
-.done h2 {
+.review-done h2 {
   font-size: 34px;
 }
-.done p {
+.review-done p {
   color: var(--ink-2);
   padding-bottom: 14px;
 }
@@ -1513,4 +1515,98 @@ html:active-view-transition-type(push) {
 }
 input[type="date"].field {
   padding: 0 10px;
+}
+
+/* ---------- Rules ---------- */
+.rule-offer {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: var(--radius-card);
+  background: var(--brand-tint);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.rule-offer-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rule-offer-text b {
+  font-size: 16px;
+  font-weight: 600;
+}
+.rule-offer-text span {
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.rule-offer-actions {
+  display: flex;
+  gap: 10px;
+}
+.rule-offer-actions .btn {
+  height: 44px;
+  font-size: 15px;
+  border-radius: 14px;
+}
+.rule-offer .btn.soft {
+  background: var(--surface);
+}
+.rule-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 20px;
+}
+.rule-block .day-head {
+  padding: 0;
+}
+.rule-block .fields {
+  padding-top: 0;
+}
+.rule-block .field-input {
+  flex: 0 1 60%;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: var(--surface-sunk);
+}
+.rule-block .seg button {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 8px;
+}
+.rule-matches .row {
+  padding-left: 0;
+  padding-right: 0;
+}
+.rule-date {
+  width: 52px;
+  flex-shrink: 0;
+  font-size: 14px;
+  color: var(--ink-3);
+}
+.rule-note {
+  font-size: 14px;
+  color: var(--ink-3);
+  padding: 6px 0 0;
+}
+.rule-foot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 12px;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  pointer-events: auto;
+}
+.toast-action {
+  color: var(--toast-action);
+  font-weight: 600;
+  white-space: nowrap;
 }

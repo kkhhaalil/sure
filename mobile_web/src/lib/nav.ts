@@ -8,7 +8,7 @@ export function bindRouter(instance: AnyRouter) {
   router = instance;
 }
 
-export type SheetSearch = { txn?: string; pick?: string; account?: string; add?: boolean };
+export type SheetSearch = { txn?: string; pick?: string; rule?: string; account?: string; add?: boolean };
 type Search = Record<string, unknown>;
 
 const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -32,6 +32,10 @@ export function back(fallback = "/") {
 // Remember which history entries opened one: closing those goes back,
 // closing a sheet that came from a link just drops the parameter.
 const opened = new Set<string>();
+
+export function openSheets(): SheetSearch {
+  return router.state.location.search as SheetSearch;
+}
 
 export function openSheet(search: SheetSearch) {
   router

@@ -261,6 +261,50 @@ class Api::V1::RulesControllerTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
+  test "preview counts and samples the transactions an unsaved rule would match" do
+    account = @family.accounts.first
+    3.times do |i|
+      account.entries.create!(name: "DELTA AIR #{i}", amount: 38 + i, currency: "USD", date: Date.current - i, entryable: Transaction.new)
+    end
+    account.entries.create!(name: "UNITED", amount: 50, currency: "USD", date: Date.current, entryable: Transaction.new)
+
+    assert_no_difference "@family.rules.count" do
+      post preview_api_v1_rules_url,
+           params: { rule: { resource_type: "transaction", conditions_attributes: [ { condition_type: "transaction_name", operator: "like", value: "delta air" } ] } },
+           headers: api_headers(@api_key)
+    end
+
+    assert_response :success
+    data = JSON.parse(response.body)["data"]
+    assert_equal 3, data["count"]
+    assert_equal [ "DELTA AIR 0", "DELTA AIR 1", "DELTA AIR 2" ], data["transactions"].map { |t| t["name"] }
+    assert_equal 3800, data["transactions"].first["amount_cents"]
+  end
+
+  test "preview narrows by amount" do
+    account = @family.accounts.first
+    account.entries.create!(name: "DELTA AIR", amount: 38, currency: "USD", date: Date.current, entryable: Transaction.new)
+    account.entries.create!(name: "DELTA AIR", amount: 412, currency: "USD", date: Date.current, entryable: Transaction.new)
+
+    post preview_api_v1_rules_url,
+         params: { rule: { resource_type: "transaction", conditions_attributes: [
+           { condition_type: "transaction_name", operator: "like", value: "delta air" },
+           { condition_type: "transaction_amount", operator: "=", value: "38" }
+         ] } },
+         headers: api_headers(@api_key)
+
+    assert_response :success
+    assert_equal 1, JSON.parse(response.body)["data"]["count"]
+  end
+
+  test "preview rejects an unsupported resource type" do
+    post preview_api_v1_rules_url,
+         params: { rule: { resource_type: "account", conditions_attributes: [] } },
+         headers: api_headers(@api_key)
+
+    assert_response :unprocessable_entity
+  end
+
   private
 
     def write_key

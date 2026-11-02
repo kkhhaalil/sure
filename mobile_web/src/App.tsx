@@ -14,6 +14,7 @@ import { NewTransactionSheet } from "./screens/NewTransaction";
 import { InstallPrompt, isStandalone, SignIn } from "./screens/Onboarding";
 import { Recurring } from "./screens/Recurring";
 import { Review } from "./screens/Review";
+import { RuleSheet } from "./screens/RuleSheet";
 import { Settings } from "./screens/Settings";
 import { CategoryDetail, Spending } from "./screens/Spending";
 import { CategoryPicker, TransactionSheet } from "./screens/TransactionSheet";
@@ -22,12 +23,13 @@ import { Transactions } from "./screens/Transactions";
 const text = (value: unknown) => (typeof value === "string" && value ? value : undefined);
 
 // Sheets are search params on any route: ?txn=<id>, ?pick=<id> (category
-// picker), ?account=<id>, ?add=true (new transaction).
+// picker), ?rule=<id> (rule from a transaction), ?account=<id>, ?add=true (new transaction).
 const rootRoute = createRootRoute({
   component: Root,
   validateSearch: (search: Record<string, unknown>): SheetSearch => ({
     txn: text(search.txn),
     pick: text(search.pick),
+    rule: text(search.rule),
     account: text(search.account),
     add: search.add === true || search.add === "true" ? true : undefined,
   }),
@@ -111,6 +113,7 @@ function Sheets() {
   const search = useSearch({ strict: false }) as SheetSearch;
   const txn = usePresence(search.txn);
   const pick = usePresence(search.pick);
+  const rule = usePresence(search.rule);
   const account = usePresence(search.account);
   const add = usePresence(search.add);
   return (
@@ -118,6 +121,7 @@ function Sheets() {
       {account.value && <AccountSheet id={account.value} open={account.open} onExited={account.onExited} />}
       {add.value && <NewTransactionSheet open={add.open} onExited={add.onExited} />}
       {txn.value && <TransactionSheet id={txn.value} open={txn.open} onExited={txn.onExited} />}
+      {rule.value && <RuleSheet id={rule.value} open={rule.open} onExited={rule.onExited} />}
       {pick.value && <CategoryPicker id={pick.value} open={pick.open} onExited={pick.onExited} />}
     </>
   );

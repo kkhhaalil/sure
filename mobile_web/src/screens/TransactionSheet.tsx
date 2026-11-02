@@ -5,10 +5,11 @@ import { Sheet } from "../components/Sheet";
 import { CategoryChip, Dot, Empty, ErrorBlock, Skeleton, Toggle, toast } from "../components/ui";
 import { api } from "../lib/api";
 import { dayLabel, money } from "../lib/format";
-import { closeSheet, openSheet } from "../lib/nav";
+import { closeSheet, openSheet, openSheets } from "../lib/nav";
 import { invalidate, useApi } from "../lib/query";
 import { useCurrentBudget, usePatchTransaction, useTransaction } from "../lib/transactions";
 import type { BudgetCategory, CategoryRef } from "../lib/types";
+import { offerRule, RuleOffer } from "./RuleSheet";
 
 type SheetProps = { id: string; open: boolean; onExited: () => void };
 
@@ -106,6 +107,8 @@ export function TransactionSheet({ id, open, onExited }: SheetProps) {
             </div>
           </div>
 
+          <RuleOffer txnId={id} label={t.merchant?.name ?? t.name} />
+
           <div className="sheet-actions">
             {!t.reviewed_at && (
               <button className="btn primary pressable" style={{ flex: 2 }} disabled={patch.isPending} onClick={() => save({ reviewed: true }, "Marked reviewed")}>
@@ -136,7 +139,6 @@ export function CategoryPicker({ id, open, onExited }: SheetProps) {
   const envelopes = useApi<{ budget_categories: BudgetCategory[] }>(budget ? "/budget_categories" : null, budget ? { budget_id: budget.id, include_amounts: true, per_page: 100 } : undefined);
   const patch = usePatchTransaction();
   const [search, setSearch] = useState("");
-  const [always, setAlways] = useState(false);
   const close = () => closeSheet("pick");
 
   const remaining = useMemo(() => new Map((envelopes.data?.budget_categories ?? []).map((c) => [c.category.id, c])), [envelopes.data]);
@@ -153,18 +155,21 @@ export function CategoryPicker({ id, open, onExited }: SheetProps) {
   }, [categories.data, search]);
 
   const choose = (category: CategoryRow) => {
-    patch.mutate(
-      { id, attrs: { category_id: category.id } },
-      {
-        onSuccess: async () => {
-          if (always) {
-            await api("/rules/from_transaction", { method: "POST", body: { transaction_id: id, category_id: category.id } }).catch(() => null);
-            toast(`Future ${t?.merchant?.name ?? "matches"} go to ${category.name}`);
-          } else toast(`Moved to ${category.name}`);
-        },
-        onError: () => toast("Couldn't change the category. Try again."),
-      },
-    );
+    const previous = t?.category?.id;
+    // The picker unmounts as it closes, before the request returns, and per-call
+    // mutate callbacks are dropped on unmount; the promise still settles.
+    patch
+      .mutateAsync({ id, attrs: { category_id: category.id } })
+      .then(() => {
+        // Changing the category from the rule sheet is part of drafting that rule.
+        const { txn, rule } = openSheets();
+        if (rule === id || category.id === previous) return;
+        offerRule({ txn: id, category: category.name });
+        // The transaction sheet underneath shows the offer; elsewhere it rides on the toast.
+        if (txn === id) toast(`Moved to ${category.name}`);
+        else toast(`Moved to ${category.name}`, { label: "Make a rule", run: () => openSheet({ rule: id }) });
+      })
+      .catch(() => toast("Couldn't change the category. Try again."));
     close();
   };
 
@@ -210,15 +215,6 @@ export function CategoryPicker({ id, open, onExited }: SheetProps) {
           })}
         </section>
       ))}
-
-      <div className="picker-foot">
-        <button className="row pressable" role="checkbox" aria-checked={always} onClick={() => setAlways((v) => !v)}>
-          <span className={`check${always ? " on" : ""}`}>{always && <Check size={13} color="#fff" strokeWidth={3} />}</span>
-          <span className="grow" style={{ fontSize: 15 }}>
-            Always use this for “{t?.merchant?.name ?? t?.name ?? "this"}”
-          </span>
-        </button>
-      </div>
     </Sheet>
   );
 }
