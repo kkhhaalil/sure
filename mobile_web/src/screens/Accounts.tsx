@@ -1,19 +1,21 @@
-import { ChevronLeft } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { useParams } from "@tanstack/react-router";
 import { useState } from "react";
+import { PushedScreen } from "../components/Screen";
 import { Sheet } from "../components/Sheet";
-import { LineChart, PullIndicator, Section, Skeleton, toast, usePullToRefresh } from "../components/ui";
+import { Empty, ErrorBlock, LineChart, Section, Skeleton, toast } from "../components/ui";
 import { api } from "../lib/api";
-import { useApi } from "../lib/data";
-import { decimalToCents, initials, isoDate, money, LOCALE } from "../lib/format";
-import { back, navigate } from "../lib/router";
+import { decimalToCents, initials, isoDate, LOCALE, money } from "../lib/format";
+import { closeSheet, go, openSheet } from "../lib/nav";
+import { useApi } from "../lib/query";
 import type { Account, Holding } from "../lib/types";
 
 const PERIODS = [
-  ["last_7_days", "1W"],
-  ["last_30_days", "1M"],
-  ["last_90_days", "3M"],
-  ["current_year", "YTD"],
-  ["last_365_days", "1Y"],
+  ["last_7_days", "1W", "this week"],
+  ["last_30_days", "1M", "this month"],
+  ["last_90_days", "3M", "in 3 months"],
+  ["current_year", "YTD", "this year"],
+  ["last_365_days", "1Y", "in a year"],
 ] as const;
 
 const GROUPS: { label: string; types: string[] }[] = [
@@ -25,61 +27,86 @@ const GROUPS: { label: string; types: string[] }[] = [
 ];
 
 type Series = { currency: string; points: { date: string; net_worth_cents: number }[] };
+type BalanceSheet = { currency: string; net_worth: { amount: string }; assets: { amount: string }; liabilities: { amount: string } };
 
 export function Accounts() {
   const [period, setPeriod] = useState<(typeof PERIODS)[number][0]>("last_90_days");
-  const series = useApi<Series>("/balance_sheet/series", { period });
-  const sheet = useApi<{ currency: string; net_worth: { amount: string }; assets: { amount: string }; liabilities: { amount: string } }>("/balance_sheet");
+  const series = useApi<Series>("/balance_sheet/series", { period }, { keepPrevious: true });
+  const sheet = useApi<BalanceSheet>("/balance_sheet");
   const accounts = useApi<{ accounts: Account[] }>("/accounts", { per_page: 100 });
-  const { pull, busy } = usePullToRefresh(() => Promise.all([series.reload(), sheet.reload(), accounts.reload()]));
 
   const points = series.data?.points ?? [];
   const first = points[0]?.net_worth_cents ?? 0;
   const last = points.at(-1)?.net_worth_cents ?? decimalToCents(sheet.data?.net_worth.amount);
   const change = first ? ((last - first) / Math.abs(first)) * 100 : 0;
   const currency = sheet.data?.currency ?? series.data?.currency ?? "USD";
-  const label = PERIODS.find(([key]) => key === period)![1];
+  const [, , span] = PERIODS.find(([key]) => key === period)!;
 
   return (
-    <main className="page" style={{ gap: 16 }}>
-      <PullIndicator pull={pull} busy={busy} />
-      <div className="card" style={{ padding: "18px 18px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
-        <span className="eyebrow" style={{ color: "var(--ink-3)" }}>
-          Net worth
-        </span>
-        {sheet.data ? (
+    <main className="page">
+      <div className="card pad lead">
+        <span className="label">Net worth</span>
+        {sheet.isError ? (
+          <ErrorBlock what="your net worth" onRetry={() => sheet.refetch()} />
+        ) : sheet.data ? (
           <>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-              <span className="display" style={{ fontSize: 38 }}>
-                {money(last, currency, { cents: false })}
-              </span>
-              {points.length > 1 && (
-                <span style={{ fontSize: 14, fontWeight: 600, color: change >= 0 ? "var(--good)" : "var(--over)" }}>
-                  {change >= 0 ? "↑" : "↓"} {Math.abs(change).toFixed(1)}% {label}
-                </span>
+            <span className="display lead-figure">{money(last, currency, { cents: false })}</span>
+            <span className="lead-sub">
+              {points.length > 1 && Math.abs(change) >= 0.05 ? (
+                <b style={{ color: change > 0 ? "var(--good-ink)" : "var(--over)" }}>
+                  {change > 0 ? "Up" : "Down"} {Math.abs(change).toFixed(1)}% {span}
+                </b>
+              ) : (
+                `No change ${span}`
               )}
-            </div>
-            <div style={{ display: "flex", gap: 16, fontSize: 13 }} className="muted">
+            </span>
+            <div className="legend">
               <span>
-                <span style={{ color: "var(--good)" }}>●</span> Assets {money(decimalToCents(sheet.data.assets.amount), currency, { cents: false })}
+                Assets <b className="num">{money(decimalToCents(sheet.data.assets.amount), currency, { cents: false })}</b>
               </span>
               <span>
-                <span style={{ color: "var(--over)" }}>●</span> Debt {money(decimalToCents(sheet.data.liabilities.amount), currency, { cents: false })}
+                Debts <b className="num">{money(decimalToCents(sheet.data.liabilities.amount), currency, { cents: false })}</b>
               </span>
             </div>
           </>
         ) : (
-          <Skeleton height={38} width="60%" />
+          <>
+            <Skeleton height={38} width="60%" />
+            <Skeleton height={16} width="40%" />
+          </>
         )}
-        <LineChart values={points.map((p) => p.net_worth_cents)} fill="var(--good-tint)" />
-        <div className="seg">
+        <div style={{ opacity: series.isPlaceholderData ? 0.5 : 1, transition: "opacity 160ms" }}>
+          {series.isError ? <ErrorBlock what="the chart" onRetry={() => series.refetch()} /> : <LineChart values={points.map((p) => p.net_worth_cents)} fill="var(--brand-tint)" />}
+        </div>
+        <div className="seg" role="radiogroup" aria-label="Period">
           {PERIODS.map(([key, text]) => (
-            <button key={key} aria-pressed={key === period} className="pressable" onClick={() => setPeriod(key)}>
+            <button key={key} role="radio" aria-checked={key === period} aria-pressed={key === period} className="pressable" onClick={() => setPeriod(key)}>
               {text}
             </button>
           ))}
         </div>
       </div>
+
+      {accounts.isError && <ErrorBlock what="your accounts" onRetry={() => accounts.refetch()} />}
+      {accounts.isPending && (
+        <Section title="Accounts">
+          <div className="card list">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="row">
+                <Skeleton height={34} width={34} radius={10} />
+                <Skeleton height={18} />
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+      {accounts.isSuccess && accounts.data.accounts.length === 0 && (
+        <div className="card list">
+          <Empty action="Add an account on the web" onAction={() => location.assign("/accounts")}>
+            No accounts yet.
+          </Empty>
+        </div>
+      )}
 
       {GROUPS.map((group) => {
         const items = (accounts.data?.accounts ?? []).filter((a) => group.types.includes(a.account_type));
@@ -89,13 +116,17 @@ export function Accounts() {
         const sameCurrency = items.every((a) => a.currency === items[0].currency);
         const total = items.reduce((sum, a) => sum + a.balance_cents, 0);
         return (
-          <Section key={group.label} title={sameCurrency ? `${group.label} · ${money(total, items[0].currency, { cents: false })}` : group.label}>
+          <section key={group.label} className="section">
+            <div className="section-head">
+              <h2>{group.label}</h2>
+              {sameCurrency && <span className="num section-total">{money(total, items[0].currency, { cents: false })}</span>}
+            </div>
             <div className="card list">
               {items.map((a) => (
                 <AccountRow key={a.id} account={a} />
               ))}
             </div>
-          </Section>
+          </section>
         );
       })}
     </main>
@@ -103,134 +134,127 @@ export function Accounts() {
 }
 
 function AccountRow({ account }: { account: Account }) {
-  const hue = [...account.name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
   return (
-    <button className="row pressable" onClick={() => navigate(`/accounts/${account.id}`)}>
-      <span style={{ width: 34, height: 34, borderRadius: 10, background: `oklch(0.45 0.09 ${hue})`, color: "#fff", display: "grid", placeItems: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+    <button className="row pressable" onClick={() => openSheet({ account: account.id })}>
+      <span className="avatar" aria-hidden>
         {initials(account.institution_name ?? account.name)}
       </span>
-      <span className="grow" style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-        <span className="name" style={{ fontSize: 15, fontWeight: 600 }}>
-          {account.name}
-        </span>
-        <span className="sub">{account.institution_name ?? account.subtype?.replace(/_/g, " ") ?? account.account_type.replace(/_/g, " ")}</span>
+      <span className="grow" style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
+        <span className="name">{account.name}</span>
+        <span className="sub">{account.institution_name ?? (account.subtype ?? account.account_type).replace(/_/g, " ")}</span>
       </span>
-      <span className="amt" style={{ fontSize: 15, color: account.classification === "liability" ? "var(--over)" : undefined }}>
+      <span className="amt" style={{ color: account.classification === "liability" ? "var(--over)" : undefined }}>
         {money(account.balance_cents, account.currency, { cents: false })}
       </span>
     </button>
   );
 }
 
-export function AccountSheet({ id }: { id: string }) {
-  const { data: account } = useApi<Account>(`/accounts/${id}`);
+export function AccountSheet({ id, open, onExited }: { id: string; open: boolean; onExited: () => void }) {
+  const account = useApi<Account>(`/accounts/${id}`);
   const start = isoDate(new Date(Date.now() - 90 * 86_400_000));
   const balances = useApi<{ balances: { date: string; end_balance_cents: number }[] }>("/balances", { account_id: id, start_date: start, per_page: 100 });
-  const [syncing, setSyncing] = useState(false);
+  const sync = useMutation({
+    mutationFn: () => api(`/accounts/${id}/sync`, { method: "POST" }),
+    onSuccess: () => toast("Sync started"),
+    onError: () => toast("Couldn't start a sync"),
+  });
+  const close = () => closeSheet("account");
 
   const values = [...(balances.data?.balances ?? [])].sort((a, b) => (a.date < b.date ? -1 : 1)).map((b) => b.end_balance_cents);
   const change = values.length > 1 ? values.at(-1)! - values[0] : 0;
+  const a = account.data;
+  const liability = a?.classification === "liability";
 
-  const sync = async () => {
-    setSyncing(true);
-    try {
-      await api(`/accounts/${id}/sync`, { method: "POST" });
-      toast("Sync started");
-    } catch {
-      toast("Couldn't start a sync");
-    } finally {
-      setSyncing(false);
-    }
+  // Leave the sheet, then push the next screen: one motion at a time.
+  const open_ = (to: string, search?: Record<string, unknown>) => {
+    close();
+    setTimeout(() => go(to, { search, push: !search }), 280);
   };
 
   return (
-    <Sheet onClose={() => back("/accounts")} label="Account">
-      {!account ? (
-        <Skeleton height={240} />
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-          <span className="eyebrow" style={{ color: "var(--ink-3)", paddingTop: 8 }}>
-            {(account.subtype ?? account.account_type).replace(/_/g, " ")}
-          </span>
-          <span className="display" style={{ fontSize: 26, paddingTop: 6, textAlign: "center" }}>
-            {account.name}
-          </span>
-          {account.institution_name && <span className="muted">{account.institution_name}</span>}
-          <div style={{ display: "flex", justifyContent: "space-around", alignSelf: "stretch", padding: "14px 0" }}>
-            <Metric label="Balance" value={money(account.balance_cents, account.currency)} />
-            <Metric label="3M change" value={money(change, account.currency, { cents: false, sign: true })} tone={change >= 0 ? "var(--good)" : "var(--over)"} />
-          </div>
-          <div style={{ alignSelf: "stretch" }}>
-            <LineChart values={values} color="var(--brand)" fill="var(--brand-tint)" height={96} />
-          </div>
-          <div style={{ display: "flex", gap: 10, alignSelf: "stretch", paddingTop: 18 }}>
-            <button className="btn soft pressable" style={{ flex: 1, fontSize: 15 }} onClick={() => navigate(account.account_type === "investment" ? `/accounts/${id}/holdings` : `/transactions?account=${id}`)}>
-              {account.account_type === "investment" ? "Holdings" : "Transactions"}
-            </button>
-            <button className="btn soft pressable" style={{ flex: 1, fontSize: 15 }} disabled={syncing} onClick={sync}>
-              {syncing ? "Syncing…" : "Sync now"}
-            </button>
-          </div>
+    <Sheet open={open} onClose={close} onExited={onExited} label="Account">
+      {account.isError ? (
+        <ErrorBlock what="this account" onRetry={() => account.refetch()} />
+      ) : !a ? (
+        <div className="txn-head">
+          <Skeleton height={14} width="30%" />
+          <Skeleton height={30} width="60%" />
+          <Skeleton height={96} />
         </div>
+      ) : (
+        <>
+          <div className="txn-head">
+            <span className="review-meta">{a.institution_name ?? (a.subtype ?? a.account_type).replace(/_/g, " ")}</span>
+            <span className="review-name" style={{ fontSize: 22 }}>
+              {a.name}
+            </span>
+            <span className="display txn-amount">{money(a.balance_cents, a.currency)}</span>
+            <span className="lead-sub">
+              {values.length > 1 && change !== 0 ? (
+                // A falling debt is good news.
+                <b style={{ color: change > 0 !== liability ? "var(--good-ink)" : "var(--over)" }}>
+                  {money(change, a.currency, { cents: false, sign: true })} in 3 months
+                </b>
+              ) : (
+                "No change in 3 months"
+              )}
+            </span>
+          </div>
+          <LineChart values={values} fill="var(--brand-tint)" height={96} />
+          <div className="sheet-actions">
+            <button className="btn soft pressable" style={{ flex: 1 }} onClick={() => (a.account_type === "investment" ? open_(`/accounts/${id}/holdings`) : open_("/transactions", { in: id }))}>
+              {a.account_type === "investment" ? "Holdings" : "Transactions"}
+            </button>
+            <button className="btn soft pressable" style={{ flex: 1 }} disabled={sync.isPending} onClick={() => sync.mutate()}>
+              {sync.isPending ? "Syncing…" : "Sync now"}
+            </button>
+          </div>
+        </>
       )}
     </Sheet>
   );
 }
 
-function Metric({ label, value, tone }: { label: string; value: string; tone?: string }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-      <span className="eyebrow" style={{ fontSize: 11, color: "var(--ink-3)" }}>
-        {label}
-      </span>
-      <span className="num" style={{ fontSize: 18, fontWeight: 700, color: tone }}>
-        {value}
-      </span>
-    </div>
-  );
-}
-
-export function Holdings({ id }: { id: string }) {
-  const { data: account } = useApi<Account>(`/accounts/${id}`);
-  const { data, loading } = useApi<{ holdings: Holding[] }>("/holdings", { account_id: id, per_page: 100 });
+export function Holdings() {
+  const { id } = useParams({ from: "/accounts/$id/holdings" });
+  const account = useApi<Account>(`/accounts/${id}`);
+  const holdings = useApi<{ holdings: Holding[] }>("/holdings", { account_id: id, per_page: 100 });
   const latest = new Map<string, Holding>();
-  for (const h of data?.holdings ?? []) if (!latest.has(h.security.id)) latest.set(h.security.id, h);
+  for (const h of holdings.data?.holdings ?? []) if (!latest.has(h.security.id)) latest.set(h.security.id, h);
 
   return (
-    <main className="page plain" style={{ gap: 18 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 44 }}>
-        <button className="icon-btn pressable" style={{ color: "var(--ink)" }} aria-label="Back" onClick={() => back("/accounts")}>
-          <ChevronLeft size={26} />
-        </button>
-        <span style={{ fontWeight: 600 }}>{account?.name ?? "Holdings"}</span>
-        <span style={{ width: 44 }} />
+    <PushedScreen id={`holdings-${id}`} title={account.data?.name ?? "Holdings"} fallback="/accounts">
+      <div className="card pad lead">
+        <span className="label">Value</span>
+        {account.data ? <span className="display lead-figure">{money(account.data.balance_cents, account.data.currency, { cents: false })}</span> : <Skeleton height={38} width="50%" />}
       </div>
-      {account && (
-        <span className="display" style={{ fontSize: 40 }}>
-          {money(account.balance_cents, account.currency, { cents: false })}
-        </span>
-      )}
       <Section title="Holdings">
         <div className="card list">
-          {loading && <Skeleton height={120} />}
+          {holdings.isError && <ErrorBlock what="holdings" onRetry={() => holdings.refetch()} />}
+          {holdings.isPending &&
+            [0, 1, 2, 3].map((i) => (
+              <div key={i} className="row">
+                <Skeleton height={18} />
+              </div>
+            ))}
+          {holdings.isSuccess && latest.size === 0 && <Empty>No holdings in this account.</Empty>}
           {[...latest.values()].map((h) => (
             <div key={h.security.id} className="row">
-              <span style={{ fontFamily: "var(--mono)", fontSize: 13, fontWeight: 700, width: 56, flexShrink: 0 }}>{h.security.ticker}</span>
-              <span className="grow" style={{ display: "flex", flexDirection: "column" }}>
-                <span className="name" style={{ fontSize: 14 }}>
+              <span className="ticker">{h.security.ticker}</span>
+              <span className="grow" style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                <span className="name" style={{ fontSize: 15 }}>
                   {h.security.name}
                 </span>
-                <span className="sub">
-                  {Number(h.qty).toLocaleString(LOCALE, { maximumFractionDigits: 4 })} sh · {h.price}
+                <span className="sub num">
+                  {Number(h.qty).toLocaleString(LOCALE, { maximumFractionDigits: 4 })} at {h.price}
                 </span>
               </span>
-              <span className="amt" style={{ fontSize: 15 }}>
-                {h.amount}
-              </span>
+              <span className="amt">{h.amount}</span>
             </div>
           ))}
         </div>
       </Section>
-    </main>
+    </PushedScreen>
   );
 }

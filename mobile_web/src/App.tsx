@@ -1,12 +1,16 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createRootRoute, createRoute, createRouter, Outlet, useLocation, useSearch } from "@tanstack/react-router";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Header, TABS, useTabSwipe } from "./components/Header";
+import { Scroller } from "./components/Screen";
+import { usePresence } from "./components/Sheet";
 import { Toaster } from "./components/ui";
 import { exchangeWebSession, getSession, onSessionChange } from "./lib/api";
-import { useOnline } from "./lib/data";
-import { match, useRoute } from "./lib/router";
+import { bindRouter, type SheetSearch } from "./lib/nav";
+import { useOnline } from "./lib/query";
 import { AccountSheet, Accounts, Holdings } from "./screens/Accounts";
 import { Assistant } from "./screens/Assistant";
 import { Home } from "./screens/Home";
+import { NewTransactionSheet } from "./screens/NewTransaction";
 import { InstallPrompt, isStandalone, SignIn } from "./screens/Onboarding";
 import { Recurring } from "./screens/Recurring";
 import { Review } from "./screens/Review";
@@ -15,21 +19,60 @@ import { CategoryDetail, Spending } from "./screens/Spending";
 import { CategoryPicker, TransactionSheet } from "./screens/TransactionSheet";
 import { Transactions } from "./screens/Transactions";
 
-const TAB_SCREENS: Record<string, () => JSX.Element> = {
-  "/": Home,
-  "/transactions": Transactions,
-  "/spending": Spending,
-  "/accounts": Accounts,
-  "/recurring": Recurring,
-};
+const text = (value: unknown) => (typeof value === "string" && value ? value : undefined);
+
+// Sheets are search params on any route: ?txn=<id>, ?pick=<id> (category
+// picker), ?account=<id>, ?add=true (new transaction).
+const rootRoute = createRootRoute({
+  component: Root,
+  validateSearch: (search: Record<string, unknown>): SheetSearch => ({
+    txn: text(search.txn),
+    pick: text(search.pick),
+    account: text(search.account),
+    add: search.add === true || search.add === "true" ? true : undefined,
+  }),
+});
+
+const tabsRoute = createRoute({ getParentRoute: () => rootRoute, id: "tabs", component: TabShell });
+const tab = (path: string, component: () => JSX.Element) => createRoute({ getParentRoute: () => tabsRoute, path, component });
+
+export type TransactionsSearch = { in?: string; filter?: "month" | "uncategorized" };
+const transactionsRoute = createRoute({
+  getParentRoute: () => tabsRoute,
+  path: "/transactions",
+  component: Transactions,
+  validateSearch: (search: Record<string, unknown>): TransactionsSearch => ({
+    in: text(search.in),
+    filter: search.filter === "month" || search.filter === "uncategorized" ? search.filter : undefined,
+  }),
+});
+
+const pushed = <P extends string>(path: P, component: () => JSX.Element) => createRoute({ getParentRoute: () => rootRoute, path, component });
+
+const routeTree = rootRoute.addChildren([
+  tabsRoute.addChildren([tab("/", Home), transactionsRoute, tab("/spending", Spending), tab("/accounts", Accounts), tab("/recurring", Recurring)]),
+  pushed("/review", Review),
+  pushed("/assistant", Assistant),
+  pushed("/settings", Settings),
+  pushed("/categories/$id", CategoryDetail),
+  pushed("/accounts/$id/holdings", Holdings),
+]);
+
+export const router = createRouter({ routeTree, basepath: "/m", defaultPreload: false, scrollRestoration: false });
+bindRouter(router);
+
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: typeof router;
+  }
+}
 
 function useSignedIn() {
   return useSyncExternalStore(onSessionChange, () => !!getSession());
 }
 
-export function App() {
+function Root() {
   const signedIn = useSignedIn();
-  const route = useRoute();
   const online = useOnline();
   const [checkedWebSession, setCheckedWebSession] = useState(signedIn);
   const [skipInstall, setSkipInstall] = useState(() => isStandalone() || sessionStorage.getItem("sure.skipInstall") === "1" || !/Mobi|Android|iPhone/.test(navigator.userAgent));
@@ -52,51 +95,44 @@ export function App() {
         }}
       />
     );
-  if (!signedIn) return checkedWebSession ? <SignIn /> : null;
+  if (!signedIn) return checkedWebSession ? <SignIn /> : <div className="app" />;
 
   return (
     <>
-      {!online && <div className="offline">Offline — showing your last synced data</div>}
-      <Routes route={route} />
+      {!online && <div className="offline">Offline. Showing your last synced data.</div>}
+      <Outlet />
+      <Sheets />
       <Toaster />
     </>
   );
 }
 
-function Routes({ route }: { route: string }) {
-  const path = route.split("?")[0];
-  // Sheets and pushed screens render over the tab the user came from.
-  const lastTab = useRef("/");
-  if (TAB_SCREENS[path]) lastTab.current = path;
-
-  let params: Record<string, string> | null;
-  if (path === "/review") return <Review />;
-  if (path === "/assistant") return <Assistant />;
-  if (path === "/settings") return <Settings />;
-  if ((params = match("/categories/:id", path))) return <CategoryDetail id={params.id} />;
-  if ((params = match("/accounts/:id/holdings", path))) return <Holdings id={params.id} />;
-
-  let overlay: JSX.Element | null = null;
-  if ((params = match("/transactions/:id/category", path))) overlay = <CategoryPicker id={params.id} />;
-  else if ((params = match("/transactions/:id", path)) && params.id !== "new") overlay = <TransactionSheet id={params.id} />;
-  else if ((params = match("/accounts/:id", path))) {
-    overlay = <AccountSheet id={params.id} />;
-    lastTab.current = "/accounts";
-  }
-
-  const tab = TAB_SCREENS[path] ? path : lastTab.current;
-  return <TabShell tab={tab} overlay={overlay} />;
+function Sheets() {
+  const search = useSearch({ strict: false }) as SheetSearch;
+  const txn = usePresence(search.txn);
+  const pick = usePresence(search.pick);
+  const account = usePresence(search.account);
+  const add = usePresence(search.add);
+  return (
+    <>
+      {account.value && <AccountSheet id={account.value} open={account.open} onExited={account.onExited} />}
+      {add.value && <NewTransactionSheet open={add.open} onExited={add.onExited} />}
+      {txn.value && <TransactionSheet id={txn.value} open={txn.open} onExited={txn.onExited} />}
+      {pick.value && <CategoryPicker id={pick.value} open={pick.open} onExited={pick.onExited} />}
+    </>
+  );
 }
 
-function TabShell({ tab, overlay }: { tab: string; overlay: JSX.Element | null }) {
-  useTabSwipe(tab);
-  const Screen = TAB_SCREENS[tab] ?? TAB_SCREENS["/"];
-  const active = TABS.find((t) => t.path === tab)?.path ?? "/";
+function TabShell() {
+  const pathname = useLocation({ select: (l) => l.pathname.replace(/^\/m/, "") || "/" });
+  const active = TABS.find((t) => t.path === pathname)?.path ?? "/";
+  useTabSwipe(active);
   return (
     <div className="app">
       <Header active={active} />
-      <Screen key={tab} />
-      {overlay}
+      <Scroller id={active} key={active}>
+        <Outlet />
+      </Scroller>
     </div>
   );
 }

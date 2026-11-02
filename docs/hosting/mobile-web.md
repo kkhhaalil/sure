@@ -17,7 +17,7 @@ the server.
 | --- | --- |
 | Home | Budget left and pace, transactions to review, budget rings, upcoming bills, this month's cash flow |
 | Review | One transaction at a time with suggested categories; swipe to approve or skip |
-| Transactions | Search, filters (this month, uncategorized), detail sheet, category picker, "always categorize this way" |
+| Transactions | Search, filters (this month, uncategorized, by account), detail sheet, category picker, "always categorize this way", manual entry |
 | Spending | This month vs. normal, 12-month bars, category detail with budget editing and rollover |
 | Accounts | Net worth over time, accounts by type, account sheet with balance history and "sync now", holdings |
 | Recurring | Bills left to pay this month, this week and later |
@@ -30,7 +30,10 @@ the mobile app links there.
 ## Building
 
 The app's source is in [`mobile_web/`](../../mobile_web) (React, Vite and
-TypeScript). Its build output, `public/m-app/`, is not committed.
+TypeScript, with TanStack Router for routes and TanStack Query for API
+data). Sheets are search parameters on the current route (`?txn=<id>`,
+`?account=<id>`), so the system back gesture closes them. Its build output,
+`public/m-app/`, is not committed.
 
 - **Docker images** build it automatically in the `mobile_web` stage of the
   [`Dockerfile`](../../Dockerfile); the final image needs no Node runtime.

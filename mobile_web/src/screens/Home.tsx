@@ -1,35 +1,18 @@
-import { api } from "../lib/api";
-import { invalidate, useApi } from "../lib/data";
-import { inDays, money, isoDate, today } from "../lib/format";
-import { navigate } from "../lib/router";
-import type { Budget, BudgetCategory, PacePoint, Recurring, Transaction } from "../lib/types";
-import { CategoryChip, PaceChart, PullIndicator, Ring, Section, Skeleton, toast, usePullToRefresh } from "../components/ui";
-
-type Page<K extends string, T> = Record<K, T[]>;
-
-// The list omits spending amounts, so read the current budget's detail.
-export function useCurrentBudget() {
-  const start = isoDate(new Date(today().getFullYear(), today().getMonth(), 1));
-  const { data } = useApi<Page<"budgets", Budget>>("/budgets", { start_date: start, per_page: 5 });
-  const summary = data?.budgets.find((b) => b.current) ?? data?.budgets[0];
-  return useApi<Budget>(summary ? `/budgets/${summary.id}` : null).data;
-}
+import { CategoryChip, Empty, ErrorBlock, PaceChart, Ring, Section, Skeleton, Stat, toast } from "../components/ui";
+import { decimalToCents, inDays, isoDate, money, monthName, today } from "../lib/format";
+import { go, openSheet } from "../lib/nav";
+import { useApi } from "../lib/query";
+import { reviewQuery, type TransactionPage, useCurrentBudget, useMarkReviewed } from "../lib/transactions";
+import type { BudgetCategory, PacePoint, Recurring } from "../lib/types";
 
 export function Home() {
-  const budget = useCurrentBudget();
+  const { budget, missing, isError: budgetError, refetch: refetchBudget } = useCurrentBudget();
   const pace = useApi<{ points: PacePoint[]; budgeted_spending_cents: number }>(budget ? `/budgets/${budget.id}/pace` : null);
-  const review = useApi<Page<"transactions", Transaction> & { pagination: { total_count: number } }>("/transactions", {
-    reviewed: false,
-    exclude_transfers: true,
-    per_page: 3,
-    start_date: isoDate(new Date(Date.now() - 30 * 86_400_000)),
-  });
-  const categories = useApi<Page<"budget_categories", BudgetCategory>>(budget ? "/budget_categories" : null, budget ? { budget_id: budget.id, include_amounts: true, per_page: 100 } : undefined);
-  const recurring = useApi<Page<"recurring_transactions", Recurring>>("/recurring_transactions", { status: "active", per_page: 50 });
+  const review = useApi<TransactionPage>("/transactions", reviewQuery(3));
+  const categories = useApi<{ budget_categories: BudgetCategory[] }>(budget ? "/budget_categories" : null, budget ? { budget_id: budget.id, include_amounts: true, per_page: 100 } : undefined);
+  const recurring = useApi<{ recurring_transactions: Recurring[] }>("/recurring_transactions", { status: "active", per_page: 50 });
   const cashFlow = useApi<{ income: string; spending: string; net_savings: string; currency: string }>("/cash_flow");
-
-  const refreshAll = () => Promise.all([pace.reload(), review.reload(), categories.reload(), recurring.reload(), cashFlow.reload()]);
-  const { pull, busy } = usePullToRefresh(refreshAll);
+  const markReviewed = useMarkReviewed();
 
   const currency = budget?.currency ?? "USD";
   const budgeted = budget?.budgeted_spending_cents ?? 0;
@@ -37,6 +20,8 @@ export function Home() {
   const points = (pace.data?.points ?? []).map((p) => ({ actual: p.actual_cumulative_cents, ideal: p.ideal_cumulative_cents }));
   const last = points[points.length - 1];
   const paceDelta = last ? last.ideal - last.actual : 0;
+  const month = monthName(isoDate(today()));
+  const Lead = budget ? "button" : "div";
 
   const rings = (categories.data?.budget_categories ?? [])
     .filter((c) => !c.subcategory && c.budgeted_spending_cents > 0)
@@ -51,69 +36,102 @@ export function Home() {
   const toReview = review.data?.transactions ?? [];
   const reviewCount = review.data?.pagination.total_count ?? 0;
 
-  const markReviewed = async () => {
-    await api("/transactions/review", { method: "POST", body: { ids: toReview.map((t) => t.id) } });
-    toast(`${toReview.length} marked reviewed`);
-    invalidate("/transactions");
+  const markShown = () => {
+    const ids = toReview.map((t) => t.id);
+    markReviewed.mutate(ids, {
+      onSuccess: () => toast(`${ids.length} marked reviewed`),
+      onError: () => toast("Couldn't mark them reviewed. Try again."),
+    });
   };
 
   return (
     <main className="page">
-      <PullIndicator pull={pull} busy={busy} />
-
-      <button className="card pad pressable" style={{ display: "flex", flexDirection: "column", gap: 6, textAlign: "left" }} onClick={() => navigate("/spending")}>
+      <Lead className={`card pad lead${budget ? " pressable" : ""}`} onClick={budget ? () => go("/spending") : undefined}>
         {budget ? (
           <>
-            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
-              <span className="display" style={{ fontSize: 34 }}>
-                {money(Math.abs(left), currency, { cents: false })}{" "}
-                <span style={{ fontFamily: "var(--font)", fontSize: 17, fontWeight: 500, letterSpacing: 0, color: "var(--ink-2)" }}>{left >= 0 ? "left" : "over"}</span>
-              </span>
-              {last && <span className={`badge ${paceDelta >= 0 ? "good" : "over"}`}>{money(Math.abs(paceDelta), currency, { cents: false })} {paceDelta >= 0 ? "under" : "over"} pace</span>}
-            </div>
-            <span className="muted" style={{ fontSize: 14 }}>
-              of {money(budgeted, currency, { cents: false })} budgeted
+            <span className="label">{month} budget</span>
+            <span className="display lead-figure">
+              {money(Math.abs(left), currency, { cents: false })} <span className="lead-unit">{left >= 0 ? "left" : "over"}</span>
             </span>
-            <PaceChart points={points} total={budgeted} />
+            <span className="lead-sub">
+              of {money(budgeted, currency, { cents: false })} budgeted
+              {last && (
+                <>
+                  {" · "}
+                  <b style={{ color: paceDelta >= 0 ? "var(--good-ink)" : "var(--over)" }}>
+                    {money(Math.abs(paceDelta), currency, { cents: false })} {paceDelta >= 0 ? "under" : "over"} pace
+                  </b>
+                </>
+              )}
+            </span>
+            {pace.isError ? <ErrorBlock what="the pace chart" onRetry={() => pace.refetch()} /> : <PaceChart points={points} total={budgeted} />}
+          </>
+        ) : budgetError ? (
+          <ErrorBlock what="your budget" onRetry={refetchBudget} />
+        ) : missing ? (
+          <>
+            <span className="label">{month} budget</span>
+            <span className="display lead-figure">No budget yet</span>
+            <span className="lead-sub">Set one on the web and your pace shows here.</span>
+            <a className="link" href="/budgets">
+              Set up a budget
+            </a>
           </>
         ) : (
           <>
-            <Skeleton height={34} width="60%" />
-            <Skeleton height={14} width="40%" />
+            <Skeleton height={14} width="34%" />
+            <Skeleton height={38} width="62%" />
+            <Skeleton height={16} width="54%" />
             <Skeleton height={96} />
           </>
         )}
-      </button>
+      </Lead>
 
-      {reviewCount > 0 && (
-        <Section title={`To review · ${reviewCount}`} action="View all" onAction={() => navigate("/review")}>
-          <div className="card" style={{ padding: "6px 16px 14px" }}>
-            {toReview.map((t) => (
-              <button key={t.id} className="row pressable" onClick={() => navigate(`/transactions/${t.id}`)}>
-                <span className="grow name">{t.merchant?.name ?? t.name}</span>
-                <CategoryChip category={t.category} />
-                <span className="amt">{money(t.amount_cents, t.currency)}</span>
-              </button>
-            ))}
-            <button className="btn tint pressable" style={{ marginTop: 6 }} onClick={markReviewed}>
-              Mark {toReview.length} as reviewed
-            </button>
+      {review.isError ? (
+        <Section title="To review">
+          <div className="card list">
+            <ErrorBlock what="transactions to review" onRetry={() => review.refetch()} />
           </div>
         </Section>
+      ) : (
+        reviewCount > 0 && (
+          <Section title={`To review · ${reviewCount}`} action="Review all" onAction={() => go("/review", { push: true })}>
+            <div className="card list">
+              {toReview.length === 0
+                ? [0, 1, 2].slice(0, Math.min(3, reviewCount)).map((i) => (
+                    <div key={i} className="row">
+                      <Skeleton height={18} />
+                    </div>
+                  ))
+                : toReview.map((t) => (
+                    <button key={t.id} className="row pressable" onClick={() => openSheet({ txn: t.id })}>
+                      <span className="grow name">{t.merchant?.name ?? t.name}</span>
+                      <CategoryChip category={t.category} />
+                      <span className="amt">{money(t.amount_cents, t.currency)}</span>
+                    </button>
+                  ))}
+              <div className="row">
+                <button className="btn tint pressable" disabled={markReviewed.isPending || toReview.length === 0} onClick={markShown}>
+                  {toReview.length > 1 ? `Mark these ${toReview.length} reviewed` : "Mark reviewed"}
+                </button>
+              </div>
+            </div>
+          </Section>
+        )
       )}
 
       {rings.length > 0 && (
-        <Section title="Budgets" action="Spending" onAction={() => navigate("/spending")}>
-          <div style={{ display: "flex", gap: 10, overflowX: "auto", margin: "0 -16px", padding: "0 16px", scrollbarWidth: "none" }} data-noswipe>
+        <Section title="Budgets" action="Spending" onAction={() => go("/spending")}>
+          <div className="rail" data-noswipe>
             {rings.map((c) => {
               const remaining = c.available_to_spend_cents;
               return (
-                <button key={c.id} className="pressable" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, width: 64, flexShrink: 0 }} onClick={() => navigate(`/categories/${c.id}`)}>
-                  <Ring spent={c.actual_spending_cents} budget={c.budgeted_spending_cents} label={c.category.name[0]} />
-                  <span className="num" style={{ fontSize: 13, fontWeight: 600 }}>
-                    {money(Math.abs(remaining), currency, { cents: false })}
+                <button key={c.id} className="ring-item pressable" onClick={() => go(`/categories/${c.id}`, { push: true })}>
+                  <Ring spent={c.actual_spending_cents} budget={c.budgeted_spending_cents} />
+                  <span className="ring-name">{c.category.name}</span>
+                  <span className="ring-left" style={{ color: remaining < 0 ? "var(--over)" : undefined }}>
+                    {money(Math.abs(remaining), currency, { cents: false })} {remaining < 0 ? "over" : "left"}
                   </span>
-                  <span style={{ fontSize: 12, color: remaining < 0 ? "var(--over)" : "var(--ink-3)" }}>{remaining < 0 ? "over" : "left"}</span>
                 </button>
               );
             })}
@@ -121,48 +139,61 @@ export function Home() {
         </Section>
       )}
 
-      {upcoming.length > 0 && (
-        <Section title="Upcoming" action="Recurring" onAction={() => navigate("/recurring")}>
-          <div style={{ display: "flex", gap: 10, overflowX: "auto", margin: "0 -16px", padding: "0 16px", scrollbarWidth: "none" }} data-noswipe>
-            {upcoming.map((r) => (
-              <div key={r.id} className="card" style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 4, minWidth: 168, flexShrink: 0 }}>
-                <span className="muted" style={{ fontSize: 12 }}>
-                  {inDays(r.next_expected_date!)}
-                </span>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                  <span style={{ fontSize: 15, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 96 }}>{r.merchant?.name ?? r.name}</span>
-                  <span className="num" style={{ fontSize: 15, fontWeight: 600 }}>
-                    {money(r.amount_cents, r.currency)}
-                  </span>
-                </div>
+      <Section title="Upcoming" action="Recurring" onAction={() => go("/recurring")}>
+        {recurring.isError ? (
+          <div className="card list">
+            <ErrorBlock what="upcoming bills" onRetry={() => recurring.refetch()} />
+          </div>
+        ) : recurring.isPending ? (
+          <div className="rail">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="card bill">
+                <Skeleton height={13} width="50%" />
+                <Skeleton height={18} />
               </div>
             ))}
           </div>
-        </Section>
-      )}
-
-      {cashFlow.data && (
-        <Section title="This month" action="Transactions" onAction={() => navigate("/transactions")}>
-          <div className="card pad" style={{ display: "flex", justifyContent: "space-between" }}>
-            <Stat label="Income" value={money(Math.round(Number(cashFlow.data.income) * 100), cashFlow.data.currency, { cents: false })} tone="good" />
-            <Stat label="Spent" value={money(Math.round(Number(cashFlow.data.spending) * 100), cashFlow.data.currency, { cents: false })} />
-            <Stat label="Net" value={money(Math.round(Number(cashFlow.data.net_savings) * 100), cashFlow.data.currency, { cents: false, sign: true })} tone="brand" />
+        ) : upcoming.length === 0 ? (
+          <div className="card list">
+            <Empty>No bills expected in the next weeks.</Empty>
           </div>
-        </Section>
-      )}
-    </main>
-  );
-}
+        ) : (
+          <div className="rail" data-noswipe>
+            {upcoming.map((r) => (
+              <div key={r.id} className="card bill">
+                <span className="label">{inDays(r.next_expected_date!)}</span>
+                <span className="bill-name">{r.merchant?.name ?? r.name}</span>
+                <span className="num bill-amt">{money(r.amount_cents, r.currency)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
 
-export function Stat({ label, value, tone }: { label: string; value: string; tone?: "good" | "brand" }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      <span className="num" style={{ fontSize: 18, fontWeight: 700, color: tone === "good" ? "var(--good)" : tone === "brand" ? "var(--brand)" : "var(--ink)" }}>
-        {value}
-      </span>
-      <span className="eyebrow" style={{ fontSize: 11, color: "var(--ink-3)" }}>
-        {label}
-      </span>
-    </div>
+      <Section title={`${month} so far`} action="Transactions" onAction={() => go("/transactions", { search: { filter: "month" } })}>
+        <div className="card pad stats">
+          {cashFlow.isError ? (
+            <ErrorBlock what="this month's cash flow" onRetry={() => cashFlow.refetch()} />
+          ) : cashFlow.data ? (
+            <>
+              <Stat label="Income" value={money(decimalToCents(cashFlow.data.income), cashFlow.data.currency, { cents: false })} />
+              <Stat label="Spent" value={money(decimalToCents(cashFlow.data.spending), cashFlow.data.currency, { cents: false })} />
+              <Stat
+                label="Net"
+                value={money(decimalToCents(cashFlow.data.net_savings), cashFlow.data.currency, { cents: false, sign: true })}
+                tone={decimalToCents(cashFlow.data.net_savings) < 0 ? "over" : undefined}
+              />
+            </>
+          ) : (
+            [0, 1, 2].map((i) => (
+              <div key={i} className="stat">
+                <Skeleton height={13} width={48} />
+                <Skeleton height={22} width={72} />
+              </div>
+            ))
+          )}
+        </div>
+      </Section>
+    </main>
   );
 }

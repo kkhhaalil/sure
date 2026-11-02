@@ -1,6 +1,8 @@
-// Follow the server's locale (the shell sets <html lang>), so dates match
-// the app's own language rather than the phone's.
+// Follow the server's locale (the shell sets <html lang>) for numbers and
+// currency. Month and weekday names sit inside English sentences, so they
+// stay English until the app's own copy is translated.
 export const LOCALE = document.documentElement.lang || undefined;
+const WORDS_LOCALE = "en";
 
 const formatters = new Map<string, Intl.NumberFormat>();
 
@@ -52,11 +54,11 @@ export function dayLabel(iso: string) {
   const diff = Math.round((today().getTime() - date.getTime()) / 86_400_000);
   if (diff === 0) return "Today";
   if (diff === 1) return "Yesterday";
-  return date.toLocaleDateString(LOCALE, { weekday: "short", month: "short", day: "numeric" });
+  return date.toLocaleDateString(WORDS_LOCALE, { weekday: "short", month: "short", day: "numeric" });
 }
 
 export function shortDate(iso: string) {
-  return parseDate(iso).toLocaleDateString(LOCALE, { month: "short", day: "numeric" });
+  return parseDate(iso).toLocaleDateString(WORDS_LOCALE, { month: "short", day: "numeric" });
 }
 
 export function inDays(iso: string) {
@@ -66,8 +68,10 @@ export function inDays(iso: string) {
   return `in ${diff} days`;
 }
 
+export const shortMonth = (date: Date) => date.toLocaleDateString(WORDS_LOCALE, { month: "short" });
+
 export function monthName(iso: string, style: "long" | "short" = "long") {
-  return parseDate(iso).toLocaleDateString(LOCALE, { month: style });
+  return parseDate(iso).toLocaleDateString(WORDS_LOCALE, { month: style });
 }
 
 export function initials(name: string) {

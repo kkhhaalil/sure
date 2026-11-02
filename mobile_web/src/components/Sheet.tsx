@@ -1,64 +1,117 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
-// Bottom sheet that follows the finger: drag the grabber (or the top of the
-// sheet) down to dismiss, release early and it springs back.
-export function Sheet({ onClose, children, label, tall = false }: { onClose: () => void; children: ReactNode; label: string; tall?: boolean }) {
-  const [closing, setClosing] = useState(false);
-  const [drag, setDrag] = useState(0);
-  const startY = useRef<number | null>(null);
-  const startedAt = useRef(0);
-  const bodyRef = useRef<HTMLDivElement>(null);
+// Keeps the last value while a sheet animates out after its route param is
+// gone, so closing by the back gesture animates the same as a tap.
+export function usePresence<T>(value: T | undefined) {
+  const [kept, setKept] = useState(value);
+  if (value !== undefined && value !== kept) setKept(value);
+  return { value: value ?? kept, open: value !== undefined, onExited: () => setKept(undefined) };
+}
 
-  const close = () => {
-    if (closing) return;
-    setClosing(true);
-    setTimeout(onClose, 240);
-  };
+const ENTER = "transform 440ms cubic-bezier(0.32, 0.72, 0, 1)";
+const EXIT = "transform 260ms cubic-bezier(0.4, 0, 1, 1)";
+
+// Bottom sheet that follows the finger. Every move is a transition on one
+// transform, so entering, dragging, springing back and leaving never fight.
+export function Sheet({
+  open,
+  onClose,
+  onExited,
+  label,
+  tall = false,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onExited: () => void;
+  label: string;
+  tall?: boolean;
+  children: ReactNode;
+}) {
+  const [entered, setEntered] = useState(false);
+  const [drag, setDrag] = useState<number | null>(null);
+  const start = useRef<{ y: number; t: number; decided: boolean } | null>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+
+  // Two frames: the first paints the sheet off screen, the second moves it.
+  useEffect(() => {
+    let second = 0;
+    const first = requestAnimationFrame(() => (second = requestAnimationFrame(() => setEntered(true))));
+    return () => {
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
+    };
+  }, []);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
+    if (open) return;
+    setDrag(null);
+    // transitionend is skipped when nothing moves (closed before entering).
+    const id = setTimeout(onExited, 320);
+    return () => clearTimeout(id);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  });
+    sheetRef.current?.focus({ preventScroll: true });
+    return () => removeEventListener("keydown", onKey);
+  }, [open]);
 
   const onTouchStart = (e: React.TouchEvent) => {
-    if ((bodyRef.current?.scrollTop ?? 0) > 0) return;
-    startY.current = e.touches[0].clientY;
-    startedAt.current = performance.now();
+    if (!open) return;
+    start.current = { y: e.touches[0].clientY, t: performance.now(), decided: false };
   };
   const onTouchMove = (e: React.TouchEvent) => {
-    if (startY.current === null) return;
-    const dy = e.touches[0].clientY - startY.current;
-    setDrag(dy > 0 ? dy : dy / 6);
+    const s = start.current;
+    if (!s) return;
+    const dy = e.touches[0].clientY - s.y;
+    if (!s.decided) {
+      // Upward, or a scrolled list: the content scrolls instead.
+      if (Math.abs(dy) < 6) return;
+      if (dy < 0 || (bodyRef.current?.scrollTop ?? 0) > 0) {
+        start.current = null;
+        return;
+      }
+      s.decided = true;
+    }
+    setDrag(Math.max(0, dy));
   };
   const onTouchEnd = () => {
-    if (startY.current === null) return;
-    const velocity = drag / Math.max(1, performance.now() - startedAt.current);
-    startY.current = null;
-    if (drag > 120 || velocity > 0.6) close();
-    else setDrag(0);
+    const s = start.current;
+    start.current = null;
+    if (!s?.decided || drag === null) return;
+    const velocity = drag / Math.max(1, performance.now() - s.t);
+    if (drag > 110 || velocity > 0.5) onClose();
+    else setDrag(null);
   };
+
+  const visible = open && entered;
+  const dragging = start.current?.decided ?? false;
+  const transform = !visible ? "translateY(calc(100% + 24px))" : drag ? `translateY(${drag}px)` : "translateY(0)";
 
   return (
     <>
-      <div className={`scrim${closing ? " closing" : ""}`} onClick={close} style={drag > 0 ? { opacity: Math.max(0.2, 1 - drag / 400) } : undefined} />
       <div
-        className={`sheet${closing ? " closing" : ""}`}
+        className="scrim"
+        onClick={onClose}
+        style={{ opacity: visible ? Math.max(0, 1 - (drag ?? 0) / 500) : 0, transition: dragging ? "none" : `opacity ${open ? 360 : 260}ms ease`, pointerEvents: open ? "auto" : "none" }}
+      />
+      <div
+        ref={sheetRef}
+        tabIndex={-1}
+        className="sheet"
         role="dialog"
         aria-modal="true"
         aria-label={label}
-        style={{
-          transform: drag ? `translateY(${drag}px)` : undefined,
-          transition: startY.current === null ? "transform 380ms cubic-bezier(0.32,0.72,0,1)" : "none",
-          minHeight: tall ? "calc(100dvh - var(--safe-top) - 60px)" : undefined,
-        }}
+        style={{ transform, transition: dragging ? "none" : open ? ENTER : EXIT, height: tall ? "calc(100% - var(--safe-top) - 48px)" : undefined }}
+        onTransitionEnd={(e) => e.target === e.currentTarget && !open && onExited()}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
+        onTouchCancel={onTouchEnd}
       >
         <div className="grabber" />
         <div className="sheet-body" ref={bodyRef}>

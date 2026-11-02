@@ -12,8 +12,11 @@ function urlBase64ToUint8Array(base64: string) {
 export async function pushState(): Promise<"unsupported" | "denied" | "off" | "on"> {
   if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return "unsupported";
   if (Notification.permission === "denied") return "denied";
-  const registration = await navigator.serviceWorker.getRegistration("/m");
-  const subscription = await registration?.pushManager.getSubscription();
+  // getSubscription can hang where push has no backend (the iOS
+  // simulator); treat no answer as "not subscribed".
+  const lookup = navigator.serviceWorker.getRegistration("/m").then((registration) => registration?.pushManager.getSubscription());
+  const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000));
+  const subscription = await Promise.race([lookup, timeout]).catch(() => null);
   return subscription ? "on" : "off";
 }
 

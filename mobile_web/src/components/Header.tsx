@@ -1,6 +1,7 @@
 import { MessageCircle, Settings } from "lucide-react";
 import { useEffect, useRef } from "react";
-import { navigate } from "../lib/router";
+import { go } from "../lib/nav";
+import { FetchingBar } from "./Screen";
 
 export const TABS = [
   { path: "/", label: "Home" },
@@ -20,21 +21,22 @@ export function Header({ active }: { active: string }) {
   return (
     <header className="header">
       <div className="header-bar">
-        <button className="icon-btn pressable" aria-label="Settings" onClick={() => navigate("/settings")}>
-          <Settings size={24} strokeWidth={1.8} />
+        <button className="icon-btn pressable" aria-label="Settings" onClick={() => go("/settings", { push: true })}>
+          <Settings size={22} strokeWidth={1.9} />
         </button>
-        <span className="title">Sure</span>
-        <button className="icon-btn pressable" aria-label="Assistant" onClick={() => navigate("/assistant")}>
-          <MessageCircle size={24} strokeWidth={1.8} />
+        <span className="wordmark">Sure</span>
+        <button className="icon-btn pressable" aria-label="Assistant" onClick={() => go("/assistant", { push: true })}>
+          <MessageCircle size={22} strokeWidth={1.9} />
         </button>
       </div>
-      <nav className="tabs" role="tablist" ref={tabsRef}>
+      <nav className="tabs" role="tablist" aria-label="Sections" ref={tabsRef}>
         {TABS.map((tab) => (
-          <button key={tab.path} role="tab" aria-selected={tab.path === active} className="tab pressable" onClick={() => navigate(tab.path, { replace: true })}>
+          <button key={tab.path} role="tab" aria-selected={tab.path === active} className="tab pressable" onClick={() => go(tab.path, { replace: true })}>
             {tab.label}
           </button>
         ))}
       </nav>
+      <FetchingBar />
     </header>
   );
 }
@@ -59,7 +61,7 @@ export function useTabSwipe(active: string) {
       if (Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.6) return;
       const i = TABS.findIndex((t) => t.path === active);
       const next = TABS[i + (dx < 0 ? 1 : -1)];
-      if (next) navigate(next.path, { replace: true });
+      if (next) go(next.path, { replace: true });
     };
     addEventListener("touchstart", down, { passive: true });
     addEventListener("touchend", up);

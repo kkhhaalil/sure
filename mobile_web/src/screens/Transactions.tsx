@@ -1,22 +1,25 @@
-import { Plus, Search, SlidersHorizontal } from "lucide-react";
+import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
+import { useSearch } from "@tanstack/react-router";
+import { ArrowLeftRight, Plus, Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { CategoryChip, Empty, ErrorBlock, Skeleton, Stat } from "../components/ui";
 import { api } from "../lib/api";
-import { useApi } from "../lib/data";
-import { dayLabel, isoDate, money, today } from "../lib/format";
-import { navigate } from "../lib/router";
-import type { Transaction } from "../lib/types";
-import { CategoryChip, PullIndicator, Skeleton, usePullToRefresh } from "../components/ui";
-import { Stat } from "./Home";
+import { dayLabel, decimalToCents, isoDate, money, monthName, today } from "../lib/format";
+import { go, openSheet } from "../lib/nav";
+import { useApi } from "../lib/query";
+import type { TransactionPage } from "../lib/transactions";
+import type { Account, Transaction } from "../lib/types";
 
-type Page = { transactions: Transaction[]; pagination: { page: number; total_pages: number; total_count: number } };
-type Filter = "all" | "month" | "uncategorized";
+const FILTERS = [
+  [undefined, "All"],
+  ["month", "This month"],
+  ["uncategorized", "Uncategorized"],
+] as const;
 
 export function Transactions() {
+  const { filter, in: accountId } = useSearch({ from: "/tabs/transactions" });
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
-  const [filter, setFilter] = useState<Filter>("all");
-  const [pages, setPages] = useState<Transaction[][]>([]);
-  const [pageCount, setPageCount] = useState(1);
   const sentinel = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -25,140 +28,161 @@ export function Transactions() {
   }, [search]);
 
   const query = useMemo(() => {
-    const q: Record<string, unknown> = { per_page: 50, search: debounced || undefined };
+    const q: Record<string, unknown> = { per_page: 50 };
+    if (debounced) q.search = debounced;
+    if (accountId) q.account_id = accountId;
     if (filter === "month") q.start_date = isoDate(new Date(today().getFullYear(), today().getMonth(), 1));
     if (filter === "uncategorized") {
       q.uncategorized = true;
       q.exclude_transfers = true;
     }
     return q;
-  }, [debounced, filter]);
+  }, [debounced, filter, accountId]);
 
-  const first = useApi<Page>("/transactions", query);
+  const list = useInfiniteQuery({
+    queryKey: ["/transactions", query, "pages"],
+    queryFn: ({ pageParam }) => api<TransactionPage>("/transactions", { query: { ...query, page: pageParam } }),
+    initialPageParam: 1,
+    getNextPageParam: (last) => (last.pagination.page < last.pagination.total_pages ? last.pagination.page + 1 : undefined),
+    placeholderData: keepPreviousData,
+  });
+  const account = useApi<Account>(accountId ? `/accounts/${accountId}` : null);
   const cashFlow = useApi<{ income: string; spending: string; savings_rate: string | null; currency: string }>("/cash_flow");
-  const { pull, busy } = usePullToRefresh(() => first.reload());
 
-  useEffect(() => {
-    setPages([]);
-    setPageCount(first.data?.pagination.total_pages ?? 1);
-  }, [first.data]);
-
-  // Infinite scroll: fetch the next page when the sentinel comes into view.
+  // Infinite scroll: the next page loads as the sentinel nears the screen.
   useEffect(() => {
     const el = sentinel.current;
     if (!el) return;
-    const observer = new IntersectionObserver(async ([entry]) => {
-      if (!entry.isIntersecting) return;
-      const next = pages.length + 2;
-      if (next > pageCount) return;
-      const page = await api<Page>("/transactions", { query: { ...query, page: next } });
-      setPages((p) => (p.length + 2 === next ? [...p, page.transactions] : p));
-    });
+    const observer = new IntersectionObserver(([entry]) => entry.isIntersecting && list.hasNextPage && !list.isFetchingNextPage && list.fetchNextPage(), { rootMargin: "400px" });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [pages.length, pageCount, query]);
+  }, [list.hasNextPage, list.isFetchingNextPage, list.fetchNextPage]);
 
-  const rows = [...(first.data?.transactions ?? []), ...pages.flat()];
+  const rows = list.data?.pages.flatMap((p) => p.transactions) ?? [];
   const groups = groupByDay(rows);
+  const setFilter = (value: (typeof FILTERS)[number][0]) => go("/transactions", { replace: true, search: { filter: value, in: accountId } });
+  const searching = search.trim().length > 0;
 
   return (
-    <main className="page" style={{ gap: 16 }}>
-      <PullIndicator pull={pull} busy={busy} />
-      <label className="card" style={{ height: 48, display: "flex", alignItems: "center", gap: 10, padding: "0 14px", borderRadius: 16 }}>
-        <Search size={18} color="var(--ink-3)" />
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search transactions"
-          enterKeyHint="search"
-          style={{ border: 0, outline: "none", background: "transparent", flex: 1, minWidth: 0 }}
-        />
-        <SlidersHorizontal size={20} color="var(--ink)" />
+    <main className="page" style={{ gap: 14 }}>
+      <label className="search">
+        <Search size={18} color="var(--ink-3)" aria-hidden />
+        <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search transactions" enterKeyHint="search" aria-label="Search transactions" />
+        {searching && (
+          <button className="pressable clear" aria-label="Clear search" onClick={() => setSearch("")}>
+            <X size={16} />
+          </button>
+        )}
       </label>
 
-      <div style={{ display: "flex", gap: 8 }}>
-        {(
-          [
-            ["all", "All"],
-            ["month", "This month"],
-            ["uncategorized", "Uncategorized"],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            className="pressable"
-            onClick={() => setFilter(value)}
-            style={{
-              padding: "7px 12px",
-              borderRadius: 12,
-              fontSize: 14,
-              fontWeight: filter === value ? 600 : 500,
-              background: filter === value ? "var(--ink)" : "var(--surface)",
-              color: filter === value ? "var(--surface)" : "var(--ink)",
-            }}
-          >
+      <div className="filters" data-noswipe>
+        {accountId && (
+          <button className="filter pressable" aria-pressed onClick={() => go("/transactions", { replace: true, search: { filter } })}>
+            {account.data?.name ?? "Account"} <X size={14} aria-label="Remove account filter" />
+          </button>
+        )}
+        {FILTERS.map(([value, label]) => (
+          <button key={label} className="filter pressable" aria-pressed={filter === value} onClick={() => setFilter(value)}>
             {label}
           </button>
         ))}
       </div>
 
-      {cashFlow.data && filter !== "uncategorized" && !debounced && (
-        <div className="card pad" style={{ display: "flex", justifyContent: "space-between", padding: 16 }}>
-          <Stat label="Income" value={money(Math.round(Number(cashFlow.data.income) * 100), cashFlow.data.currency, { cents: false })} tone="good" />
-          <Stat label="Spent" value={money(Math.round(Number(cashFlow.data.spending) * 100), cashFlow.data.currency, { cents: false })} />
-          <Stat label="Savings rate" value={cashFlow.data.savings_rate ? `${Math.round(Number(cashFlow.data.savings_rate))}%` : "—"} tone="brand" />
+      {filter === "month" && !accountId && !searching && (
+        <div className="card pad stats">
+          {cashFlow.data ? (
+            <>
+              <Stat label={`${monthName(isoDate(today()))} income`} value={money(decimalToCents(cashFlow.data.income), cashFlow.data.currency, { cents: false })} />
+              <Stat label="Spent" value={money(decimalToCents(cashFlow.data.spending), cashFlow.data.currency, { cents: false })} />
+              <Stat label="Saved" value={cashFlow.data.savings_rate ? `${Math.round(Number(cashFlow.data.savings_rate))}%` : "—"} />
+            </>
+          ) : (
+            <Skeleton height={44} />
+          )}
         </div>
       )}
 
-      {first.loading && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {list.isError && !list.data && (
+        <div className="card list">
+          <ErrorBlock what="transactions" onRetry={() => list.refetch()} />
+        </div>
+      )}
+
+      {list.isPending && (
+        <div className="card list">
           {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} height={22} />
+            <div key={i} className="row">
+              <Skeleton height={18} />
+            </div>
           ))}
         </div>
       )}
 
-      {!first.loading && rows.length === 0 && <p className="muted" style={{ textAlign: "center", paddingTop: 40 }}>No transactions match.</p>}
+      {list.isSuccess && rows.length === 0 && (
+        <div className="card list">
+          <Empty action={searching || filter ? "Show all" : undefined} onAction={() => (setSearch(""), setFilter(undefined))}>
+            {searching ? `Nothing matches “${search.trim()}”.` : filter === "uncategorized" ? "Everything has a category." : "No transactions yet."}
+          </Empty>
+        </div>
+      )}
 
-      <div style={{ display: "flex", flexDirection: "column", padding: "0 4px" }}>
+      <div style={{ opacity: list.isPlaceholderData ? 0.5 : 1, transition: "opacity 160ms" }}>
         {groups.map(([day, items]) => (
-          <div key={day}>
-            <div className="eyebrow" style={{ color: "var(--ink-3)", padding: "14px 0 4px" }}>
-              {dayLabel(day)}
+          <section key={day} className="day">
+            <h2 className="day-head">
+              <span>{dayLabel(day)}</span>
+              <DaySpend items={items} />
+            </h2>
+            <div className="card list">
+              {items.map((t) => (
+                <TransactionRow key={t.id} t={t} />
+              ))}
             </div>
-            {items.map((t) => (
-              <TransactionRow key={t.id} t={t} />
-            ))}
-          </div>
+          </section>
         ))}
+        {list.isFetchingNextPage && (
+          <div className="card list" style={{ marginTop: 12 }}>
+            <div className="row">
+              <Skeleton height={18} />
+            </div>
+          </div>
+        )}
         <div ref={sentinel} style={{ height: 1 }} />
       </div>
 
-      <button className="fab pressable" aria-label="Add transaction" onClick={() => navigate("/transactions/new")}>
-        <Plus size={22} strokeWidth={2.4} />
+      <button className="fab pressable" aria-label="Add transaction" onClick={() => openSheet({ add: true })}>
+        <Plus size={24} strokeWidth={2.2} />
       </button>
     </main>
   );
 }
 
+const isTransfer = (t: Transaction) => !!t.transfer || ["funds_movement", "cc_payment"].includes(t.kind);
+
 export function TransactionRow({ t }: { t: Transaction }) {
-  const isTransfer = !!t.transfer || ["funds_movement", "cc_payment"].includes(t.kind);
-  const income = t.classification === "income";
+  const transfer = isTransfer(t);
+  const income = t.classification === "income" && !transfer;
   return (
-    <button className="row pressable" style={{ borderTop: 0, minHeight: 44, padding: "9px 0" }} onClick={() => navigate(`/transactions/${t.id}`)}>
-      <span className="grow name" style={{ color: isTransfer ? "var(--ink-3)" : undefined }}>
-        {isTransfer ? "↔ " : ""}
+    <button className="row pressable" onClick={() => openSheet({ txn: t.id })}>
+      <span className="grow name" style={{ color: transfer ? "var(--ink-3)" : undefined }}>
+        {transfer && <ArrowLeftRight size={14} style={{ marginRight: 6, verticalAlign: -2 }} aria-label="Transfer" />}
         {t.merchant?.name ?? t.name}
       </span>
-      {!isTransfer && <CategoryChip category={t.category} />}
-      <span className="amt" style={{ color: income ? "var(--good)" : isTransfer ? "var(--ink-3)" : undefined }}>
-        {income ? "+" : ""}
+      {!transfer && <CategoryChip category={t.category} />}
+      <span className="amt" style={{ color: income ? "var(--good-ink)" : transfer ? "var(--ink-3)" : undefined }}>
+        {t.classification === "income" ? "+" : ""}
         {money(t.amount_cents, t.currency)}
       </span>
-      {!t.reviewed_at && !isTransfer && <span aria-label="Not reviewed" style={{ width: 6, height: 6, borderRadius: 3, background: "var(--brand)", flexShrink: 0 }} />}
+      <span className={`unreviewed${!t.reviewed_at && !transfer ? " on" : ""}`} aria-label={!t.reviewed_at && !transfer ? "Not reviewed" : undefined} />
     </button>
   );
+}
+
+// What the day cost: spending only, and only when it is in one currency.
+function DaySpend({ items }: { items: Transaction[] }) {
+  const spent = items.filter((t) => t.classification !== "income" && !isTransfer(t));
+  if (!spent.length || spent.some((t) => t.currency !== spent[0].currency)) return null;
+  return <span className="num">{money(spent.reduce((sum, t) => sum + t.amount_cents, 0), spent[0].currency)}</span>;
 }
 
 function groupByDay(rows: Transaction[]) {
