@@ -32,6 +32,14 @@ class InstitutionIconTest < ActiveSupport::TestCase
     assert_nil InstitutionIcon.for("")
   end
 
+  test "signs a domain so the app can load the icon without a session cookie" do
+    signature = InstitutionIcon.signature("chase.com")
+
+    assert_equal "chase.com", InstitutionIcon.verified_domain(signature)
+    assert_nil InstitutionIcon.verified_domain("forged")
+    assert_nil InstitutionIcon.verified_domain(nil)
+  end
+
   test "draws a lettermark for a domain with no icon" do
     lettermark = InstitutionIcon.lettermark("wellsfargo.com")
 

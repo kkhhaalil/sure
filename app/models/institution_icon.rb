@@ -31,6 +31,29 @@ class InstitutionIcon
   DOMAIN_PATTERN = /\A[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+\z/
 
   class << self
+    # Signed URL support. The mobile web app authenticates its API calls with a
+    # bearer token, so an <img> it renders carries no session cookie and the
+    # authenticated icon route answered with a redirect to the login page. The
+    # signature is a capability: a URL we handed out for one institution loads
+    # without a session, and anything unsigned or tampered with does not.
+    SIGNATURE_PURPOSE = "institution_icon"
+
+    def signature(domain)
+      verifier.generate(domain.to_s.downcase)
+    end
+
+    def verified_domain(signature)
+      return nil if signature.blank?
+
+      verifier.verified(signature)
+    rescue ActiveSupport::MessageVerifier::InvalidSignature
+      nil
+    end
+
+    def verifier
+      Rails.application.message_verifier(SIGNATURE_PURPOSE)
+    end
+
     # Returns a Result, or nil when no source produced a usable icon.
     def for(domain)
       domain = normalize(domain)

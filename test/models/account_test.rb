@@ -1262,7 +1262,11 @@ class AccountTest < ActiveSupport::TestCase
 
     Setting.stubs(:brand_fetch_client_id).returns(nil)
 
-    assert_equal "/institution_icons?institution=discover.com", account.logo_url
+    expected = Rails.application.routes.url_helpers.institution_icon_path(
+      institution: "discover.com",
+      sig: InstitutionIcon.signature("discover.com")
+    )
+    assert_equal expected, account.logo_url
   end
 
   private

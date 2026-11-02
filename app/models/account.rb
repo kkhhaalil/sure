@@ -697,8 +697,12 @@ class Account < ApplicationRecord
     elsif institution_domain.present?
       # Self-hosted installs rarely hold a Brandfetch client id, so fall back to
       # the app's own cached icon route rather than rendering a lettermark for
-      # every account the catalog could identify.
-      Rails.application.routes.url_helpers.institution_icon_path(institution: institution_domain)
+      # every account the catalog could identify. The signature lets the mobile
+      # web app's <img> load it, which carries no session cookie.
+      Rails.application.routes.url_helpers.institution_icon_path(
+        institution: institution_domain,
+        sig: InstitutionIcon.signature(institution_domain)
+      )
     end
   end
 
