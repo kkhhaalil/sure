@@ -33,6 +33,7 @@ export function Header({ active }: { active: string }) {
           <Settings size={22} strokeWidth={1.9} />
         </button>
         <span className="wordmark">Sure</span>
+        <h1 className="visually-hidden">{TABS.find((tab) => tab.path === active)?.label}</h1>
         <button className="icon-btn pressable" aria-label="Assistant" onClick={() => go("/assistant", { push: true })}>
           <MessageCircle size={22} strokeWidth={1.9} />
         </button>

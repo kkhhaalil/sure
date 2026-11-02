@@ -33,6 +33,7 @@
   --scrim: rgb(10 22 50 / 0.45);
   --shadow-card: 0 8px 24px rgb(20 37 74 / 0.06);
   --shadow-lift: 0 16px 36px rgb(20 37 74 / 0.12);
+  --shadow-lead: 0 16px 36px rgb(20 37 74 / 0.12);
   --radius-card: 22px;
   --font: "Avenir Next", "Nunito Sans", system-ui, -apple-system, sans-serif;
   --display: var(--font);
@@ -75,6 +76,7 @@
     --scrim: rgb(0 0 0 / 0.6);
     --shadow-card: none;
     --shadow-lift: 0 16px 36px rgb(0 0 0 / 0.5);
+    --shadow-lead: none;
     color-scheme: dark;
   }
 }
@@ -370,7 +372,7 @@ select {
 }
 .card.lead {
   border-radius: 26px;
-  box-shadow: var(--shadow-lift);
+  box-shadow: var(--shadow-lead);
 }
 .card.pad {
   padding: 18px;
@@ -398,10 +400,9 @@ select {
   padding: 0 6px;
 }
 .section-head h2 {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 .section-head .link {
   display: inline-flex;
@@ -619,40 +620,35 @@ select {
 
 /* Category chip: the category's colour as a tint, its name in that colour
    pulled toward the ink so it reads on either theme. On a transaction a
-   category is always this chip; on a category row it is a coloured name. */
+   category is always this chip; on a category row it is a coloured name.
+   Names keep their own capitals: in caps, "Transportation" no longer fit. */
 .chip {
   --c: var(--ink-4);
   display: inline-block;
   height: 24px;
   line-height: 24px;
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 12.5px;
+  font-weight: 600;
   padding: 0 9px;
   border-radius: 12px;
   white-space: nowrap;
-  max-width: 112px;
+  max-width: 128px;
   overflow: hidden;
   text-overflow: ellipsis;
   background: color-mix(in srgb, var(--c) 15%, var(--surface));
-  color: color-mix(in srgb, var(--c) 72%, var(--ink));
+  color: color-mix(in srgb, var(--c) 62%, var(--ink));
   flex-shrink: 0;
 }
 .chip.empty {
   background: transparent;
   box-shadow: inset 0 0 0 1.5px var(--bar);
   color: var(--ink-3);
-  letter-spacing: 0;
-  text-transform: none;
-  font-size: 13px;
-  font-weight: 600;
 }
 .field-value .chip {
   max-width: 190px;
 }
 .category-name {
-  color: color-mix(in srgb, var(--c, var(--ink-4)) 72%, var(--ink));
+  color: color-mix(in srgb, var(--c, var(--ink-4)) 62%, var(--ink));
   font-weight: 600;
 }
 

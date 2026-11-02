@@ -142,7 +142,7 @@ export function LineChart({ values, height = 80, color = "var(--brand)", area = 
 }
 
 // Months as bars against a reference line. Past months stay neutral; the
-// current one is green, or red when it is over the line.
+// current one carries the brand, or red when it is over the line.
 export function Bars({ values, normal, height = 110 }: { values: number[]; normal?: number; height?: number }) {
   const max = Math.max(normal ?? 0, ...values, 1) * 1.1;
   return (
@@ -156,7 +156,7 @@ export function Bars({ values, normal, height = 110 }: { values: number[]; norma
             style={{
               flex: 1,
               height: v > 0 ? Math.max(4, (v / max) * height) : 2,
-              background: last ? (over ? "var(--over)" : "var(--good)") : "var(--bar)",
+              background: last ? (over ? "var(--over)" : "var(--brand)") : "var(--bar)",
               borderRadius: 5,
               transition: "height 600ms cubic-bezier(0.32,0.72,0,1)",
             }}
