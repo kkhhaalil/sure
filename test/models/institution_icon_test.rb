@@ -1,11 +1,21 @@
 require "test_helper"
 
 class InstitutionIconTest < ActiveSupport::TestCase
-  test "returns the first image a source provides" do
+  test "prefers the monochrome vector mark when the institution publishes one" do
+    stub_request(:get, "https://cdn.simpleicons.org/chase")
+      .to_return(status: 200, body: "<svg>#{'v' * 400}</svg>", headers: { "content-type" => "image/svg+xml" })
+
+    result = InstitutionIcon.for("chase.com")
+
+    assert_equal "image/svg+xml", result.content_type
+    assert_includes result.body, "<svg>"
+  end
+
+  test "falls back to favicons for institutions without a vector mark" do
     stub_request(:get, %r{google\.com/s2/favicons})
       .to_return(status: 200, body: "i" * 500, headers: { "content-type" => "image/png; charset=binary" })
 
-    result = InstitutionIcon.for("chase.com")
+    result = InstitutionIcon.for("alaskaair.com")
 
     assert_equal 500, result.body.bytesize
     assert_equal "image/png", result.content_type
@@ -15,7 +25,7 @@ class InstitutionIconTest < ActiveSupport::TestCase
     stub_request(:get, %r{google\.com/s2/favicons}).to_return(status: 200, body: "x", headers: { "content-type" => "image/png" })
     stub_request(:get, %r{icons\.duckduckgo\.com}).to_return(status: 200, body: "i" * 800, headers: { "content-type" => "image/x-icon" })
 
-    result = InstitutionIcon.for("discover.com")
+    result = InstitutionIcon.for("alaskaair.com")
 
     assert_equal "image/x-icon", result.content_type
   end

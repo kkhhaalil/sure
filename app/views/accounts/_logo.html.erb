@@ -8,8 +8,10 @@
 } %>
 
 <% if account.logo_url.present? %>
+  <%# Institution icons are monochrome vectors; a white tile keeps them legible
+      in dark mode, where a black mark on the page background disappears. %>
   <%= image_tag account.logo_url,
-        class: "shrink-0 rounded-full #{size_classes[size]}",
+        class: "shrink-0 rounded-full #{size_classes[size]} #{'bg-white p-1' if account.logo_url.include?('/institution_icons')}",
         loading: "lazy" %>
 <% else %>
   <%= render DS::FilledIcon.new(

@@ -12,9 +12,33 @@ require "net/http"
 class InstitutionIcon
   Result = Data.define(:body, :content_type)
 
-  # Both are keyless: Google's favicon service first (larger, full-colour PNG/JPEG
-  # for most banks), DuckDuckGo's icon proxy as the fallback.
+  # Monochrome vector marks (Simple Icons) for the institutions that publish
+  # one. Preferred over favicons: the favicon of a big bank is usually a 32px
+  # raster that turns to mush in a 36px avatar, while the vector stays crisp at
+  # any size and is already single-colour.
+  VECTOR_SLUGS = {
+    "chase.com" => "chase",
+    "americanexpress.com" => "americanexpress",
+    "discover.com" => "discover",
+    "robinhood.com" => "robinhood",
+    "wellsfargo.com" => "wellsfargo",
+    "bankofamerica.com" => "bankofamerica",
+    "coinbase.com" => "coinbase",
+    "apple.com" => "apple",
+    "paypal.com" => "paypal",
+    "venmo.com" => "venmo",
+    "cash.app" => "cashapp",
+    "target.com" => "target",
+    "binance.com" => "binance",
+    "wise.com" => "wise",
+    "hsbc.com" => "hsbc",
+    "barclays.com" => "barclays"
+  }.freeze
+
+  # Vector mark first, then the favicon services (full-colour, but the only
+  # option for institutions without a published vector).
   SOURCES = [
+    ->(domain) { (slug = VECTOR_SLUGS[domain]) && "https://cdn.simpleicons.org/#{slug}" },
     ->(domain) { "https://www.google.com/s2/favicons?domain=#{domain}&sz=128" },
     ->(domain) { "https://icons.duckduckgo.com/ip3/#{domain}.ico" }
   ].freeze
@@ -90,13 +114,18 @@ class InstitutionIcon
     end
 
     private
+      # v2: the source order changed (vector marks before favicons), so icons
+      # cached under v1 must not be reused.
       def cache_key(domain)
-        "institution_icon/v1/#{domain}"
+        "institution_icon/v2/#{domain}"
       end
 
       def fetch(domain)
         SOURCES.each do |source|
-          result = download(source.call(domain))
+          url = source.call(domain)
+          next if url.blank?
+
+          result = download(url)
           return result if result && result.body.bytesize >= MIN_BYTES
         end
         nil
