@@ -701,7 +701,8 @@ class Account < ApplicationRecord
       # web app's <img> load it, which carries no session cookie.
       Rails.application.routes.url_helpers.institution_icon_path(
         institution: institution_domain,
-        sig: InstitutionIcon.signature(institution_domain)
+        sig: InstitutionIcon.signature(institution_domain),
+        v: InstitutionIcon::VERSION
       )
     end
   end

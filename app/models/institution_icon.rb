@@ -12,6 +12,10 @@ require "net/http"
 class InstitutionIcon
   Result = Data.define(:body, :content_type)
 
+  # Bumped whenever the choice of source or its rendering changes, so URLs the
+  # browser already holds (cached for a week) forget the previous image.
+  VERSION = 3
+
   # Monochrome vector marks (Simple Icons) for the institutions that publish
   # one. Preferred over favicons: the favicon of a big bank is usually a 32px
   # raster that turns to mush in a 36px avatar, while the vector stays crisp at
@@ -35,10 +39,15 @@ class InstitutionIcon
     "barclays.com" => "barclays"
   }.freeze
 
+  # Some institutions publish only a wordmark as their mark ("AMERICAN EXPRESS",
+  # "WELLS FARGO", "DISCOVER"), which turns to mush in a 36px avatar; their
+  # favicon is a compact boxed monogram that still reads. Those keep the favicon.
+  FAVICON_DOMAINS = %w[americanexpress.com discover.com wellsfargo.com].freeze
+
   # Vector mark first, then the favicon services (full-colour, but the only
   # option for institutions without a published vector).
   SOURCES = [
-    ->(domain) { (slug = VECTOR_SLUGS[domain]) && "https://cdn.simpleicons.org/#{slug}" },
+    ->(domain) { (slug = VECTOR_SLUGS[domain]) && !FAVICON_DOMAINS.include?(domain) && "https://cdn.simpleicons.org/#{slug}" },
     ->(domain) { "https://www.google.com/s2/favicons?domain=#{domain}&sz=128" },
     ->(domain) { "https://icons.duckduckgo.com/ip3/#{domain}.ico" }
   ].freeze
@@ -114,10 +123,10 @@ class InstitutionIcon
     end
 
     private
-      # v2: the source order changed (vector marks before favicons), so icons
-      # cached under v1 must not be reused.
+      # Versioned so a change of source never reuses bytes cached under the
+      # previous choice.
       def cache_key(domain)
-        "institution_icon/v2/#{domain}"
+        "institution_icon/v#{VERSION}/#{domain}"
       end
 
       def fetch(domain)

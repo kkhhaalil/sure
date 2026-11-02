@@ -1264,7 +1264,8 @@ class AccountTest < ActiveSupport::TestCase
 
     expected = Rails.application.routes.url_helpers.institution_icon_path(
       institution: "discover.com",
-      sig: InstitutionIcon.signature("discover.com")
+      sig: InstitutionIcon.signature("discover.com"),
+      v: InstitutionIcon::VERSION
     )
     assert_equal expected, account.logo_url
   end
