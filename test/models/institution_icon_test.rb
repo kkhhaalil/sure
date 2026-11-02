@@ -2,20 +2,34 @@ require "test_helper"
 
 class InstitutionIconTest < ActiveSupport::TestCase
   test "prefers the monochrome vector mark when the institution publishes one" do
-    stub_request(:get, "https://cdn.simpleicons.org/chase")
+    stub_request(:get, "https://cdn.simpleicons.org/hsbc")
       .to_return(status: 200, body: "<svg>#{'v' * 400}</svg>", headers: { "content-type" => "image/svg+xml" })
 
-    result = InstitutionIcon.for("chase.com")
+    result = InstitutionIcon.for("hsbc.com")
 
     assert_equal "image/svg+xml", result.content_type
     assert_includes result.body, "<svg>"
+  end
+
+  test "serves the bundled app-icon art for a brand that ships with one" do
+    robinhood = InstitutionIcon.for("robinhood.com")
+    assert_equal "image/svg+xml", robinhood.content_type
+    assert_includes robinhood.body, "#CCFF00"
+
+    wealthfront = InstitutionIcon.for("wealthfront.com")
+    assert_equal "image/jpeg", wealthfront.content_type
+    assert_operator wealthfront.body.bytesize, :>, 1000
+
+    chase = InstitutionIcon.for("chase.com")
+    assert_equal "image/png", chase.content_type
+    assert_operator chase.body.bytesize, :>, 1000
   end
 
   test "falls back to favicons for institutions without a vector mark" do
     stub_request(:get, %r{google\.com/s2/favicons})
       .to_return(status: 200, body: "i" * 500, headers: { "content-type" => "image/png; charset=binary" })
 
-    result = InstitutionIcon.for("alaskaair.com")
+    result = InstitutionIcon.for("fidelity.com")
 
     assert_equal 500, result.body.bytesize
     assert_equal "image/png", result.content_type
@@ -25,7 +39,7 @@ class InstitutionIconTest < ActiveSupport::TestCase
     stub_request(:get, %r{google\.com/s2/favicons}).to_return(status: 200, body: "x", headers: { "content-type" => "image/png" })
     stub_request(:get, %r{icons\.duckduckgo\.com}).to_return(status: 200, body: "i" * 800, headers: { "content-type" => "image/x-icon" })
 
-    result = InstitutionIcon.for("alaskaair.com")
+    result = InstitutionIcon.for("fidelity.com")
 
     assert_equal "image/x-icon", result.content_type
   end

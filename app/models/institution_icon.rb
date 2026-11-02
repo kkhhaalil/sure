@@ -14,7 +14,7 @@ class InstitutionIcon
 
   # Bumped whenever the choice of source or its rendering changes, so URLs the
   # browser already holds (cached for a week) forget the previous image.
-  VERSION = 3
+  VERSION = 6
 
   # Monochrome vector marks (Simple Icons) for the institutions that publish
   # one. Preferred over favicons: the favicon of a big bank is usually a 32px
@@ -37,6 +37,27 @@ class InstitutionIcon
     "wise.com" => "wise",
     "hsbc.com" => "hsbc",
     "barclays.com" => "barclays"
+  }.freeze
+
+  # App-icon tiles we ship ourselves. A brand's app mark is often a filled tile
+  # that no favicon or wordmark reproduces, and at avatar size the tile is what
+  # people recognise.
+  BUNDLED = {
+    "chase.com" => "institutions/chase.png",
+    "americanexpress.com" => "institutions/americanexpress.png",
+    "coinbase.com" => "institutions/coinbase.png",
+    "alaskaair.com" => "institutions/alaskaair.png",
+    "wellsfargo.com" => "institutions/wellsfargo.png",
+    "discover.com" => "institutions/discover.png",
+    "robinhood.com" => "institutions/robinhood.svg",
+    "wealthfront.com" => "institutions/wealthfront.jpg"
+  }.freeze
+
+  BUNDLED_CONTENT_TYPES = {
+    ".svg" => "image/svg+xml",
+    ".png" => "image/png",
+    ".jpg" => "image/jpeg",
+    ".jpeg" => "image/jpeg"
   }.freeze
 
   # Some institutions publish only a wordmark as their mark ("AMERICAN EXPRESS",
@@ -130,6 +151,13 @@ class InstitutionIcon
       end
 
       def fetch(domain)
+        if (bundled = BUNDLED[domain])
+          path = Rails.root.join("app/assets/images", bundled)
+          content_type = BUNDLED_CONTENT_TYPES.fetch(path.extname.downcase)
+
+          return Result.new(body: path.binread, content_type: content_type)
+        end
+
         SOURCES.each do |source|
           url = source.call(domain)
           next if url.blank?
