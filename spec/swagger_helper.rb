@@ -777,6 +777,78 @@ RSpec.configure do |config|
               data: { '$ref' => '#/components/schemas/Rule' }
             }
           },
+          InvestmentsOverview: {
+            type: :object,
+            required: %w[currency period total_cents change_cents series accounts allocation holdings],
+            properties: {
+              currency: { type: :string },
+              period: { type: :string },
+              total_cents: { type: :integer },
+              change_cents: { type: :integer },
+              change_percent: { type: :string, nullable: true },
+              series: {
+                type: :array,
+                items: {
+                  type: :object,
+                  required: %w[date value_cents],
+                  properties: { date: { type: :string, format: :date }, value_cents: { type: :integer } }
+                }
+              },
+              accounts: {
+                type: :array,
+                items: {
+                  type: :object,
+                  required: %w[id name account_type balance_cents change_cents],
+                  properties: {
+                    id: { type: :string, format: :uuid },
+                    name: { type: :string },
+                    account_type: { type: :string, enum: %w[investment crypto] },
+                    subtype: { type: :string, nullable: true },
+                    institution_name: { type: :string, nullable: true },
+                    balance_cents: { type: :integer },
+                    change_cents: { type: :integer },
+                    change_percent: { type: :string, nullable: true }
+                  }
+                }
+              },
+              allocation: {
+                type: :array,
+                items: {
+                  type: :object,
+                  required: %w[key label value_cents percent],
+                  properties: {
+                    key: { type: :string, description: 'An asset class, or securities, cash, crypto or other' },
+                    label: { type: :string },
+                    value_cents: { type: :integer },
+                    percent: { type: :string }
+                  }
+                }
+              },
+              holdings: {
+                type: :array,
+                items: {
+                  type: :object,
+                  required: %w[security qty value_cents price_cents spark],
+                  properties: {
+                    security: {
+                      type: :object,
+                      properties: {
+                        id: { type: :string, format: :uuid },
+                        ticker: { type: :string },
+                        name: { type: :string },
+                        logo_url: { type: :string, nullable: true }
+                      }
+                    },
+                    qty: { type: :string },
+                    value_cents: { type: :integer },
+                    price_cents: { type: :integer },
+                    day_change_percent: { type: :string, nullable: true },
+                    spark: { type: :array, items: { type: :integer }, description: 'Position value per day over the last 30 days' }
+                  }
+                }
+              }
+            }
+          },
           RulePreviewResponse: {
             type: :object,
             required: %w[data],

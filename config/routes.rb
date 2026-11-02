@@ -847,6 +847,7 @@ Rails.application.routes.draw do
         get :series
       end
       resource :spending_vs_normal, only: [ :show ], controller: :spending_vs_normal
+      resource :investments, only: [ :show ]
       resource :balance_sheet, only: [ :show ], controller: :balance_sheet do
         get :series
       end

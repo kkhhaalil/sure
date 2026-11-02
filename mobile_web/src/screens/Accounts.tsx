@@ -10,7 +10,7 @@ import { closeSheet, go, openSheet } from "../lib/nav";
 import { useApi } from "../lib/query";
 import type { Account, Holding } from "../lib/types";
 
-const PERIODS = [
+export const PERIODS = [
   ["last_7_days", "1W", "this week"],
   ["last_30_days", "1M", "this month"],
   ["last_90_days", "3M", "in 3 months"],

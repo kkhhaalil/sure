@@ -259,6 +259,16 @@ class InvestmentStatement
     )
   end
 
+  # Current holdings rolled up by security across accounts, in family
+  # currency: [[security, value, holdings], ...], largest first.
+  def holdings_by_security
+    holdings_rolled_up_by_security
+  end
+
+  def to_family_currency(amount, from_currency)
+    convert_to_family_currency(amount, from_currency)
+  end
+
   # Investment accounts
   def investment_accounts
     @investment_accounts ||= begin

@@ -8,6 +8,7 @@ export const TABS = [
   { path: "/transactions", label: "Transactions" },
   { path: "/spending", label: "Spending" },
   { path: "/accounts", label: "Accounts" },
+  { path: "/investments", label: "Investments" },
   { path: "/recurring", label: "Recurring" },
 ] as const;
 

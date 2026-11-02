@@ -705,61 +705,57 @@ class Demo::Generator
     end
 
     def generate_investment_transactions!
-      security = Security.first || Security.create!(ticker: "VTI", name: "Vanguard Total Stock Market ETF", country_code: "US")
-
-      generate_401k_trades!(security)
-      generate_brokerage_trades!(security)
-      generate_roth_trades!(security)
-      generate_uk_isa_trades!(security)
+      generate_401k_trades!
+      generate_brokerage_trades!
+      generate_roth_trades!
+      generate_uk_isa_trades!
     end
 
-    # ---------------------------------------------------- 401k (180 trades) --
-    def generate_401k_trades!(security)
-      payroll_dates = collect_payroll_dates.first(90) # 90 paydays ⇒ 180 trades
-
-      payroll_dates.each do |date|
-        # Employee contribution $1 200
-        create_trade_for(@vanguard_401k, security, 1_200, date, "401k Employee")
-
-        # Employer match $300
-        create_trade_for(@vanguard_401k, security, 300, date, "401k Employer Match")
+    # ---------------------------------------------------- 401k (270 trades) --
+    # Target-date style split of each paycheck's contribution and match.
+    def generate_401k_trades!
+      collect_payroll_dates.first(90).each do |date|
+        { "VTI" => 0.6, "VXUS" => 0.25, "BND" => 0.15 }.each do |ticker, share|
+          create_trade_for(@vanguard_401k, ticker, 1_500 * share, date, "401k Contribution")
+        end
       end
     end
 
     # -------------------------------------------- Brokerage (144 trades) -----
-    def generate_brokerage_trades!(security)
-      date_cursor = 36.months.ago.beginning_of_month
-      while date_cursor <= Date.current
+    # Individual stocks and a dividend ETF, bought in rotation.
+    def generate_brokerage_trades!
+      tickers = %w[AAPL MSFT NVDA AMZN GOOGL SCHD VTI]
+      each_month do |month|
         4.times do |i|
-          trade_date = date_cursor + i * 7.days # roughly spread within month
-          create_trade_for(@schwab_brokerage, security, rand(400..1_000), trade_date, "Brokerage Purchase")
+          create_trade_for(@schwab_brokerage, pick(tickers), rand(400..1_000), month + i * 7.days, "Brokerage Purchase")
         end
-        date_cursor = date_cursor.next_month.beginning_of_month
       end
     end
 
     # ----------------------------------------------- Roth IRA (108 trades) ---
-    def generate_roth_trades!(security)
-      date_cursor = 36.months.ago.beginning_of_month
-      while date_cursor <= Date.current
-        # Split $500 monthly across 3 staggered trades
-        3.times do |i|
-          trade_date = date_cursor + i * 10.days
-          create_trade_for(@fidelity_roth_ira, security, (500 / 3.0), trade_date, "Roth IRA Contribution")
+    def generate_roth_trades!
+      each_month do |month|
+        %w[VTI VNQ GLD].each_with_index do |ticker, i|
+          create_trade_for(@fidelity_roth_ira, ticker, 500 / 3.0, month + i * 10.days, "Roth IRA Contribution")
         end
-        date_cursor = date_cursor.next_month.beginning_of_month
       end
     end
 
     # ------------------------------------------------- UK ISA (108 trades) ----
-    def generate_uk_isa_trades!(security)
-      date_cursor = 36.months.ago.beginning_of_month
-      while date_cursor <= Date.current
-        3.times do |i|
-          trade_date = date_cursor + i * 10.days
-          create_trade_for(@uk_isa, security, (400 / 3.0), trade_date, "ISA Investment", price_range: 60..150)
+    # London-listed funds priced in pounds, like the account.
+    def generate_uk_isa_trades!
+      each_month do |month|
+        %w[VWRL ISF VWRL].each_with_index do |ticker, i|
+          create_trade_for(@uk_isa, ticker, 400 / 3.0, month + i * 10.days, "ISA Investment")
         end
-        date_cursor = date_cursor.next_month.beginning_of_month
+      end
+    end
+
+    def each_month
+      month = 36.months.ago.to_date.beginning_of_month
+      while month <= Date.current
+        yield month
+        month = month.next_month
       end
     end
 
@@ -775,10 +771,16 @@ class Demo::Generator
       dates
     end
 
-    def create_trade_for(account, security, investment_amount, date, memo, price_range: 80..200)
-      price = rand(price_range)
-      qty   = (investment_amount.to_f / price).round(2)
-      create_investment_transaction!(account, security, qty, price, date, memo)
+    # Buys at that day's demo price, so trades, holdings and prices agree.
+    def create_trade_for(account, ticker, investment_amount, date, memo)
+      return if date > Date.current
+
+      security = demo_security(ticker)
+      price = demo_price(ticker, date)
+      qty = (investment_amount.to_f / price).round(4)
+      # The contribution funds the buy, so the account's cash stays near zero.
+      account.entries.create!(entryable: Transaction.new, amount: -(qty * price), name: memo, currency: account.currency, date: date)
+      create_investment_transaction!(account, security, qty, price, date, "Buy #{ticker}")
     end
 
     def generate_major_purchases!
@@ -1029,7 +1031,7 @@ class Demo::Generator
     def create_investment_transaction!(account, security, qty, price, date, name)
       account.entries.create!(
         entryable: Trade.new(security: security, qty: qty, price: price, currency: account.currency),
-        amount: -(qty * price),
+        amount: qty * price,
         name: name,
         currency: account.currency,
         date: date
@@ -1054,14 +1056,64 @@ class Demo::Generator
       Transfer.create!(inflow_transaction: inflow.entryable, outflow_transaction: outflow.entryable)
     end
 
-    def load_securities!
-      return if Security.exists?
+    # The demo portfolio: start price three years ago, yearly drift and
+    # volatility for the price walk, and a classification for allocation.
+    DEMO_SECURITIES = [
+      { ticker: "VTI", name: "Vanguard Total Stock Market ETF", mic: "ARCX", currency: "USD", asset_class: "equity", asset_sub_class: "etf", price: 205.0, drift: 0.11, vol: 0.17 },
+      { ticker: "VXUS", name: "Vanguard Total International Stock ETF", mic: "XNAS", currency: "USD", asset_class: "equity", asset_sub_class: "etf", price: 54.0, drift: 0.06, vol: 0.16 },
+      { ticker: "BND", name: "Vanguard Total Bond Market ETF", mic: "XNAS", currency: "USD", asset_class: "fixed_income", asset_sub_class: "bond", price: 73.0, drift: 0.01, vol: 0.06 },
+      { ticker: "AAPL", name: "Apple Inc.", mic: "XNAS", currency: "USD", asset_class: "equity", asset_sub_class: "stock", price: 150.0, drift: 0.17, vol: 0.27 },
+      { ticker: "MSFT", name: "Microsoft Corporation", mic: "XNAS", currency: "USD", asset_class: "equity", asset_sub_class: "stock", price: 285.0, drift: 0.18, vol: 0.25 },
+      { ticker: "NVDA", name: "NVIDIA Corporation", mic: "XNAS", currency: "USD", asset_class: "equity", asset_sub_class: "stock", price: 42.0, drift: 0.55, vol: 0.48 },
+      { ticker: "AMZN", name: "Amazon.com, Inc.", mic: "XNAS", currency: "USD", asset_class: "equity", asset_sub_class: "stock", price: 105.0, drift: 0.16, vol: 0.32 },
+      { ticker: "GOOGL", name: "Alphabet Inc. Class A", mic: "XNAS", currency: "USD", asset_class: "equity", asset_sub_class: "stock", price: 98.0, drift: 0.17, vol: 0.29 },
+      { ticker: "SCHD", name: "Schwab U.S. Dividend Equity ETF", mic: "ARCX", currency: "USD", asset_class: "equity", asset_sub_class: "etf", price: 25.0, drift: 0.06, vol: 0.14 },
+      { ticker: "VNQ", name: "Vanguard Real Estate ETF", mic: "ARCX", currency: "USD", asset_class: "real_estate", asset_sub_class: "real_estate", price: 84.0, drift: 0.03, vol: 0.2 },
+      { ticker: "GLD", name: "SPDR Gold Shares", mic: "ARCX", currency: "USD", asset_class: "commodity", asset_sub_class: "precious_metal", price: 168.0, drift: 0.12, vol: 0.14 },
+      { ticker: "VWRL", name: "Vanguard FTSE All-World UCITS ETF", mic: "XLON", currency: "GBP", asset_class: "equity", asset_sub_class: "etf", price: 92.0, drift: 0.09, vol: 0.15 },
+      { ticker: "ISF", name: "iShares Core FTSE 100 UCITS ETF", mic: "XLON", currency: "GBP", asset_class: "equity", asset_sub_class: "etf", price: 7.4, drift: 0.05, vol: 0.13 }
+    ].freeze
+    DEMO_PRICE_DAYS = 3 * 365 + 31
 
-      Security.create!([
-        { ticker: "VTI", name: "Vanguard Total Stock Market ETF", country_code: "US" },
-        { ticker: "VXUS", name: "Vanguard Total International Stock ETF", country_code: "US" },
-        { ticker: "BND", name: "Vanguard Total Bond Market ETF", country_code: "US" }
-      ])
+    # Creates the demo securities and a daily price history for each, so
+    # holdings value from stored prices and nothing is fetched from a provider.
+    def load_securities!
+      @demo_prices = {}
+      first_day = Date.current - DEMO_PRICE_DAYS
+
+      DEMO_SECURITIES.each do |spec|
+        security = Security.find_or_initialize_by(ticker: spec[:ticker], exchange_operating_mic: spec[:mic])
+        security.update!(
+          name: spec[:name], country_code: spec[:mic] == "XLON" ? "GB" : "US", offline: true,
+          asset_class: spec[:asset_class], asset_sub_class: spec[:asset_sub_class], classification_source: "manual"
+        )
+
+        prices = demo_price_walk(spec, first_day)
+        @demo_prices[spec[:ticker]] = { security: security, prices: prices }
+        Security::Price.upsert_all(
+          prices.map { |date, price| { security_id: security.id, date: date, price: price, currency: spec[:currency] } },
+          unique_by: %i[security_id date currency]
+        )
+      end
+    end
+
+    # A seeded geometric random walk, one step a day.
+    def demo_price_walk(spec, first_day)
+      step = 1.0 / 365
+      price = spec[:price]
+      (first_day..Date.current).to_h do |date|
+        shock = Math.sqrt(-2 * Math.log(1 - rand)) * Math.cos(2 * Math::PI * rand)
+        price *= Math.exp((spec[:drift] - spec[:vol]**2 / 2) * step + spec[:vol] * Math.sqrt(step) * shock)
+        [ date, price.round(2) ]
+      end
+    end
+
+    def demo_security(ticker)
+      @demo_prices.fetch(ticker)[:security]
+    end
+
+    def demo_price(ticker, date)
+      @demo_prices.fetch(ticker)[:prices].fetch(date)
     end
 
     def sync_family_accounts!(family)

@@ -10,6 +10,7 @@ import { useOnline } from "./lib/query";
 import { AccountSheet, Accounts, Holdings } from "./screens/Accounts";
 import { Assistant } from "./screens/Assistant";
 import { Home } from "./screens/Home";
+import { Investments } from "./screens/Investments";
 import { NewTransactionSheet } from "./screens/NewTransaction";
 import { InstallPrompt, isStandalone, SignIn } from "./screens/Onboarding";
 import { Recurring } from "./screens/Recurring";
@@ -52,7 +53,7 @@ const transactionsRoute = createRoute({
 const pushed = <P extends string>(path: P, component: () => JSX.Element) => createRoute({ getParentRoute: () => rootRoute, path, component });
 
 const routeTree = rootRoute.addChildren([
-  tabsRoute.addChildren([tab("/", Home), transactionsRoute, tab("/spending", Spending), tab("/accounts", Accounts), tab("/recurring", Recurring)]),
+  tabsRoute.addChildren([tab("/", Home), transactionsRoute, tab("/spending", Spending), tab("/accounts", Accounts), tab("/investments", Investments), tab("/recurring", Recurring)]),
   pushed("/review", Review),
   pushed("/assistant", Assistant),
   pushed("/settings", Settings),

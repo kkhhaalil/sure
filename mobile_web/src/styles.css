@@ -1610,3 +1610,119 @@ input[type="date"].field {
   font-weight: 600;
   white-space: nowrap;
 }
+
+/* ---------- Investments ---------- */
+.invest-lead {
+  align-items: center;
+  text-align: center;
+}
+.invest-lead > div,
+.invest-lead .seg {
+  align-self: stretch;
+}
+.change {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  align-self: center;
+}
+.change.up {
+  background: var(--good-tint);
+  color: var(--good-ink);
+}
+.change.down {
+  background: var(--over-tint);
+  color: var(--over);
+}
+.change.flat {
+  background: var(--surface-sunk);
+  color: var(--ink-3);
+}
+.section-note {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-3);
+}
+.mover {
+  width: 132px;
+  flex-shrink: 0;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mover-ticker {
+  font-size: 14px;
+  font-weight: 700;
+}
+.mover-name {
+  font-size: 13px;
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-bottom: 6px;
+}
+.mover .change {
+  align-self: flex-start;
+  margin-top: 6px;
+}
+.stack-end {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.delta {
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.alloc {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 16px 14px;
+}
+.alloc-row {
+  display: contents;
+}
+.alloc-label {
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 500;
+}
+.alloc-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-sunk);
+  overflow: hidden;
+}
+.alloc-bar {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  transition: width 600ms var(--spring);
+}
+.alloc-pct {
+  font-size: 14px;
+  font-weight: 600;
+  text-align: right;
+}
+.holding-name {
+  font-size: 15px;
+  color: var(--ink-2);
+}
+.holding-spark {
+  width: 56px;
+  flex-shrink: 0;
+}
