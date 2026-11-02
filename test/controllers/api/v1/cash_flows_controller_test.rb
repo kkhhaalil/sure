@@ -116,6 +116,44 @@ class Api::V1::CashFlowsControllerTest < ActionDispatch::IntegrationTest
     assert_equal users(:empty).family.currency, response.parsed_body["currency"]
   end
 
+  test "series returns income and spending per month, oldest first" do
+    travel_to Date.new(2024, 3, 15) do
+      create_transaction(account: accounts(:depository), date: Date.new(2024, 2, 10), amount: 120, name: "Feb spend")
+      create_transaction(account: accounts(:depository), date: Date.new(2024, 3, 5), amount: 80, name: "Mar spend")
+
+      get "/api/v1/cash_flow/series", params: { months: 3 }, headers: api_headers(@auth)
+
+      assert_response :success
+      body = JSON.parse(response.body)
+      assert_equal %w[2024-01-01 2024-02-01 2024-03-01], body["months"].map { |m| m["month"] }
+      feb = body["months"].find { |m| m["month"] == "2024-02-01" }
+      assert_operator feb["spending"].to_d, :>=, 120
+      assert body["months"].all? { |m| m.key?("income") && m.key?("spending") }
+    end
+  end
+
+  test "series narrows spending to one category" do
+    travel_to Date.new(2024, 3, 15) do
+      food = categories(:food_and_drink)
+      create_transaction(account: accounts(:depository), date: Date.new(2024, 3, 2), amount: 30, name: "Lunch", category: food)
+      create_transaction(account: accounts(:depository), date: Date.new(2024, 3, 3), amount: 500, name: "TV")
+
+      get "/api/v1/cash_flow/series", params: { months: 1, category_id: food.id }, headers: api_headers(@auth)
+
+      assert_response :success
+      march = JSON.parse(response.body)["months"].last
+      assert_equal "30.0", march["spending"]
+    end
+  end
+
+  test "series rejects months outside 1 to 24" do
+    get "/api/v1/cash_flow/series", params: { months: 0 }, headers: api_headers(@auth)
+    assert_response :unprocessable_entity
+
+    get "/api/v1/cash_flow/series", params: { months: 25 }, headers: api_headers(@auth)
+    assert_response :unprocessable_entity
+  end
+
   private
     def api_headers(auth)
       { "X-Api-Key" => auth.display_key }

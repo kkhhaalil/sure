@@ -5,9 +5,9 @@ class Api::V1::TransactionsController < Api::V1::BaseController
   include Api::V1::TransactionLookup
 
   # Ensure proper scope authorization for read vs write access
-  before_action :ensure_read_scope, only: [ :index, :show ]
-  before_action :ensure_write_scope, only: [ :create, :update, :destroy ]
-  before_action :set_transaction, only: [ :show, :update, :destroy ]
+  before_action :ensure_read_scope, only: [ :index, :show, :category_suggestions ]
+  before_action :ensure_write_scope, only: [ :create, :update, :destroy, :review ]
+  before_action :set_transaction, only: [ :show, :update, :destroy, :category_suggestions ]
 
   def index
     family = current_resource_owner.family
@@ -159,6 +159,7 @@ class Api::V1::TransactionsController < Api::V1::BaseController
         @entry.sync_account_later if sync_needed
         @entry.lock_saved_attributes!
         @entry.mark_user_modified! if user_modified_requested?
+        @entry.mark_reviewed!(reviewed_requested?) if reviewed_provided?
 
         @transaction = @entry.transaction
         render :show
@@ -205,7 +206,59 @@ class Api::V1::TransactionsController < Api::V1::BaseController
     }, status: :internal_server_error
   end
 
+  def category_suggestions
+    suggestions = Transaction::CategorySuggester.new(@transaction).suggestions
+
+    render json: {
+      transaction_id: @transaction.id,
+      suggestions: suggestions.map do |suggestion|
+        {
+          category_id: suggestion.category.id,
+          name: suggestion.category.name,
+          color: suggestion.category.color,
+          icon: suggestion.category.lucide_icon,
+          confidence: suggestion.confidence,
+          source: suggestion.source
+        }
+      end
+    }
+  end
+
+  # Marks a batch of the caller's transactions reviewed, for a review queue's
+  # "Mark all as reviewed". Ids outside the caller's accessible accounts are
+  # skipped rather than reported, matching how index scopes them.
+  def review
+    ids = Array(params[:ids]).compact_blank
+    if ids.empty? || ids.any? { |id| !valid_uuid?(id) }
+      render json: { error: "validation_failed", message: "ids must be a non-empty array of transaction ids" },
+             status: :unprocessable_entity
+      return
+    end
+
+    entry_ids = accessible_transactions_scope.where(id: ids).select("entries.id")
+    reviewed_count = Entry.where(id: entry_ids).unreviewed.update_all(reviewed_at: Time.current, updated_at: Time.current)
+
+    render json: { reviewed_count: reviewed_count }
+  end
+
   private
+
+    def accessible_transactions_scope
+      family = current_resource_owner.family
+      accessible_account_ids = family.accounts
+        .accessible_by(current_resource_owner)
+        .where.not(status: "pending_deletion")
+        .select(:id)
+      family.transactions.joins(:entry).where(entries: { account_id: accessible_account_ids })
+    end
+
+    def reviewed_provided?
+      params[:transaction]&.key?(:reviewed)
+    end
+
+    def reviewed_requested?
+      ActiveModel::Type::Boolean.new.cast(params.dig(:transaction, :reviewed))
+    end
 
     def set_transaction
       load_accessible_transaction(params[:id])
@@ -278,6 +331,24 @@ class Api::V1::TransactionsController < Api::V1::BaseController
         )
       end
 
+      if boolean_param(:uncategorized)
+        query = query.where(category_id: nil)
+      end
+
+      if boolean_param(:exclude_transfers)
+        query = query
+          .where.not(kind: Transaction::TRANSFER_KINDS)
+          .where.missing(:transfer_as_outflow, :transfer_as_inflow)
+      end
+
+      unless params[:excluded].nil?
+        query = query.where(entries: { excluded: boolean_param(:excluded) ? true : [ false, nil ] })
+      end
+
+      unless params[:reviewed].nil?
+        query = boolean_param(:reviewed) ? query.merge(Entry.reviewed) : query.merge(Entry.unreviewed)
+      end
+
       # Transaction type filtering (income/expense)
       if params[:type].present?
         case params[:type].downcase
@@ -289,6 +360,10 @@ class Api::V1::TransactionsController < Api::V1::BaseController
       end
 
       query
+    end
+
+    def boolean_param(key)
+      ActiveModel::Type::Boolean.new.cast(params[key])
     end
 
     def apply_search(query)
@@ -305,7 +380,7 @@ class Api::V1::TransactionsController < Api::V1::BaseController
     def transaction_params
       params.require(:transaction).permit(
         :date, :amount, :name, :description, :notes, :currency,
-        :category_id, :merchant_id, :nature, :user_modified, tag_ids: []
+        :category_id, :merchant_id, :nature, :user_modified, :reviewed, :excluded, tag_ids: []
       )
     end
 
@@ -362,6 +437,10 @@ class Api::V1::TransactionsController < Api::V1::BaseController
       # Only update amount if provided
       if transaction_params[:amount].present?
         entry_params[:amount] = calculate_signed_amount
+      end
+
+      if transaction_params.key?(:excluded)
+        entry_params[:excluded] = ActiveModel::Type::Boolean.new.cast(transaction_params[:excluded])
       end
 
       entry_params.compact

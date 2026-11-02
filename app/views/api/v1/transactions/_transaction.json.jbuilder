@@ -31,6 +31,7 @@ json.notes transaction.entry.notes
 json.external_id transaction.entry.external_id
 json.source transaction.entry.source
 json.user_modified transaction.entry.user_modified
+json.reviewed_at transaction.entry.reviewed_at&.iso8601
 json.classification transaction.entry.classification
 
 # How budgets and reports treat the row: loan_payment counts as an expense
@@ -74,6 +75,7 @@ if transaction.merchant.present?
   json.merchant do
     json.id transaction.merchant.id
     json.name transaction.merchant.name
+    json.logo_url transaction.merchant.logo_url
   end
 else
   json.merchant nil

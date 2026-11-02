@@ -7,9 +7,9 @@ class PushSubscription::Delivery
   end
 
   def call
-    return :skipped unless Apns::Client.available? && @subscription.eligible?
+    return :skipped unless @subscription.push_client_class.available? && @subscription.eligible?
 
-    response = yield Apns::Client.new(environment: @subscription.environment)
+    response = yield @subscription.build_push_client
     return :accepted if response.ok?
 
     status = response.status.to_i

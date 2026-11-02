@@ -43,6 +43,33 @@ class Api::V1::BalanceSheetControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "series returns daily net worth for the requested period" do
+    get "/api/v1/balance_sheet/series", params: { period: "last_30_days" }, headers: api_headers(@auth)
+
+    assert_response :success
+    body = JSON.parse(response.body)
+    assert_equal @family.currency, body["currency"]
+    assert_equal "last_30_days", body["period"]
+    assert_operator body["points"].size, :>=, 2
+    point = body["points"].last
+    assert_equal %w[date net_worth net_worth_cents].sort, point.keys.sort
+    assert_kind_of Integer, point["net_worth_cents"]
+    assert_equal body["points"].map { |p| p["date"] }.sort, body["points"].map { |p| p["date"] }
+  end
+
+  test "series defaults to the last 30 days" do
+    get "/api/v1/balance_sheet/series", headers: api_headers(@auth)
+
+    assert_response :success
+    assert_equal "last_30_days", JSON.parse(response.body)["period"]
+  end
+
+  test "series rejects an unknown period" do
+    get "/api/v1/balance_sheet/series", params: { period: "forever" }, headers: api_headers(@auth)
+
+    assert_response :unprocessable_entity
+  end
+
   private
 
     def api_headers(auth)

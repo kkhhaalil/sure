@@ -40,6 +40,44 @@ class Api::V1::CashFlowsController < Api::V1::BaseController
     end
   end
 
+
+  # GET /api/v1/cash_flow/series?months=12[&category_id=]
+  # Income and spending per calendar month, oldest first, ending with the
+  # current (partial) month. With category_id, spending covers that category
+  # and its subcategories only.
+  def series
+    months = Integer(params.fetch(:months, 12), exception: false)
+    unless months&.between?(1, 24)
+      return invalid_query("invalid_months", "months must be between 1 and 24")
+    end
+
+    category_ids = nil
+    if params[:category_id].present?
+      category = current_resource_owner.family.categories.find(params[:category_id])
+      category_ids = [ category.id ]
+    end
+
+    statement = current_resource_owner.family.income_statement(user: current_resource_owner)
+    today = Time.zone.today
+    first_month = today.beginning_of_month << (months - 1)
+
+    rows = (0...months).map do |offset|
+      month = first_month >> offset
+      period = Period.custom(start_date: month, end_date: [ month.end_of_month, today ].min)
+      totals = statement.totals_for(period)
+      spending = if category_ids
+        statement.daily_expense_series(period: period, category_ids: category_ids).sum { |day| day.total.to_d }
+      else
+        totals.expense_money.amount
+      end
+
+      { month: month.iso8601, income: totals.income_money.amount.to_d.to_s("F"), spending: spending.to_d.to_s("F") }
+    end
+
+    response.headers["Cache-Control"] = "private, no-store"
+    render json: { currency: current_resource_owner.family.currency, category_id: category_ids&.first, months: rows }
+  end
+
   private
     def invalid_query(error, message)
       render json: { error: error, message: message }, status: :unprocessable_entity

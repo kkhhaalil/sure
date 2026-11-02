@@ -87,6 +87,12 @@ class Entry < ApplicationRecord
   scope :unreconciled, -> { where(reconciled_at: nil) }
   scope :reconciled_by, ->(statement) { where(reconciled_by_statement_id: statement) }
 
+  # Review state is the user's "I've looked at this" mark from a review
+  # queue. It is independent of user_modified (an edit) and reconciled_at
+  # (a statement match), and it never locks attributes against sync.
+  scope :reviewed, -> { where.not(reviewed_at: nil) }
+  scope :unreviewed, -> { where(reviewed_at: nil) }
+
   # Pending transaction scopes - check Transaction.extra for provider pending flags
   # Works with any provider that stores pending status in extra["provider_name"]["pending"]
   scope :pending, -> {
@@ -457,6 +463,14 @@ class Entry < ApplicationRecord
   def mark_user_modified!
     return true if user_modified?
     update!(user_modified: true)
+  end
+
+  def reviewed?
+    reviewed_at.present?
+  end
+
+  def mark_reviewed!(reviewed = true)
+    update_column(:reviewed_at, reviewed ? (reviewed_at || Time.current) : nil)
   end
 
   # Returns the reason this entry is protected from sync, or nil if not protected.

@@ -132,6 +132,8 @@ module Api
             id: merchant.id,
             name: merchant.name,
             type: merchant.type,
+            logo_url: merchant.logo_url,
+            website_url: merchant.website_url,
             created_at: merchant.created_at,
             updated_at: merchant.updated_at
           }

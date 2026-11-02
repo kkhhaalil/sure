@@ -153,3 +153,5 @@ group :test do
   gem "climate_control"
   gem "simplecov", require: false
 end
+
+gem "web-push", "~> 3.1"

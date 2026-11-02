@@ -1339,4 +1339,20 @@ class Api::V1::AuthControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_equal [], JSON.parse(response.body)["providers"]
   end
+
+  test "logout revokes the bearer token it was called with" do
+    user = users(:family_admin)
+    token = MobileDevice.upsert_device!(user, @device_info).issue_token!
+
+    post "/api/v1/auth/logout", headers: { "Authorization" => "Bearer #{token[:access_token]}" }
+    assert_response :no_content
+
+    get "/api/v1/accounts", headers: { "Authorization" => "Bearer #{token[:access_token]}" }
+    assert_response :unauthorized
+  end
+
+  test "logout requires a token" do
+    post "/api/v1/auth/logout"
+    assert_response :unauthorized
+  end
 end

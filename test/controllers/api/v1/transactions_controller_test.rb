@@ -1072,6 +1072,191 @@ end
     assert_equal false, row["excluded"]
   end
 
+  test "uncategorized filter returns only transactions without a category" do
+    uncategorized = create_transaction(account: @account, amount: 15, name: "No category").transaction
+    categorized = create_transaction(account: @account, amount: 25, name: "Has category", category: categories(:food_and_drink)).transaction
+
+    get api_v1_transactions_url, params: { uncategorized: true, per_page: 100 }, headers: api_headers(@api_key)
+    assert_response :success
+
+    ids = JSON.parse(response.body)["transactions"].map { |t| t["id"] }
+    assert_includes ids, uncategorized.id
+    assert_not_includes ids, categorized.id
+    assert JSON.parse(response.body)["transactions"].all? { |t| t["category"].nil? }
+  end
+
+  test "exclude_transfers filter leaves transfer legs out" do
+    to_account = @family.accounts.create!(name: "Savings", balance: 0, currency: "USD", accountable: Depository.new)
+    transfer = create_transfer(from_account: @account, to_account: to_account, amount: 40)
+
+    get api_v1_transactions_url, params: { exclude_transfers: true, per_page: 100 }, headers: api_headers(@api_key)
+    assert_response :success
+
+    ids = JSON.parse(response.body)["transactions"].map { |t| t["id"] }
+    assert_not_includes ids, transfer.outflow_transaction.id
+    assert_not_includes ids, transfer.inflow_transaction.id
+  end
+
+  test "excluded filter selects by the excluded flag" do
+    hidden = create_transaction(account: @account, amount: 9, name: "Hidden")
+    hidden.update!(excluded: true)
+    shown = create_transaction(account: @account, amount: 11, name: "Shown")
+
+    get api_v1_transactions_url, params: { excluded: false, per_page: 100 }, headers: api_headers(@api_key)
+    ids = JSON.parse(response.body)["transactions"].map { |t| t["id"] }
+    assert_includes ids, shown.transaction.id
+    assert_not_includes ids, hidden.transaction.id
+
+    get api_v1_transactions_url, params: { excluded: true, per_page: 100 }, headers: api_headers(@api_key)
+    ids = JSON.parse(response.body)["transactions"].map { |t| t["id"] }
+    assert_equal [ hidden.transaction.id ], ids
+  end
+
+  test "transaction JSON exposes reviewed_at" do
+    get api_v1_transaction_url(@transaction), headers: api_headers(@api_key)
+    assert_response :success
+    body = JSON.parse(response.body)
+    assert body.key?("reviewed_at")
+    assert_nil body["reviewed_at"]
+  end
+
+  test "reviewed filter splits reviewed from unreviewed transactions" do
+    reviewed = create_transaction(account: @account, amount: 5, name: "Reviewed")
+    reviewed.update!(reviewed_at: 1.hour.ago)
+    pending = create_transaction(account: @account, amount: 6, name: "Pending")
+
+    get api_v1_transactions_url, params: { reviewed: false, per_page: 100 }, headers: api_headers(@api_key)
+    ids = JSON.parse(response.body)["transactions"].map { |t| t["id"] }
+    assert_includes ids, pending.transaction.id
+    assert_not_includes ids, reviewed.transaction.id
+
+    get api_v1_transactions_url, params: { reviewed: true, per_page: 100 }, headers: api_headers(@api_key)
+    ids = JSON.parse(response.body)["transactions"].map { |t| t["id"] }
+    assert_includes ids, reviewed.transaction.id
+    assert_not_includes ids, pending.transaction.id
+  end
+
+  test "update marks a transaction reviewed and can clear it" do
+    patch api_v1_transaction_url(@transaction),
+          params: { transaction: { reviewed: true } },
+          headers: api_headers(@api_key)
+    assert_response :success
+    assert_not_nil JSON.parse(response.body)["reviewed_at"]
+    assert_not_nil @transaction.entry.reload.reviewed_at
+
+    patch api_v1_transaction_url(@transaction),
+          params: { transaction: { reviewed: false } },
+          headers: api_headers(@api_key)
+    assert_response :success
+    assert_nil @transaction.entry.reload.reviewed_at
+  end
+
+  test "marking reviewed does not mark the transaction user_modified" do
+    entry = create_transaction(account: @account, amount: 7, name: "Untouched")
+
+    patch api_v1_transaction_url(entry.transaction),
+          params: { transaction: { reviewed: true } },
+          headers: api_headers(@api_key)
+    assert_response :success
+    assert_equal false, entry.reload.user_modified
+  end
+
+  test "review marks several transactions reviewed at once" do
+    first = create_transaction(account: @account, amount: 3, name: "First")
+    second = create_transaction(account: @account, amount: 4, name: "Second")
+
+    post review_api_v1_transactions_url,
+         params: { ids: [ first.transaction.id, second.transaction.id ] },
+         headers: api_headers(@api_key)
+    assert_response :success
+
+    body = JSON.parse(response.body)
+    assert_equal 2, body["reviewed_count"]
+    assert_not_nil first.reload.reviewed_at
+    assert_not_nil second.reload.reviewed_at
+  end
+
+  test "review ignores transactions from another family" do
+    other_family_transaction = families(:empty).accounts.create!(
+      name: "Other", balance: 0, currency: "USD", accountable: Depository.new
+    ).entries.create!(name: "Not yours", amount: 1, currency: "USD", date: Date.current, entryable: Transaction.new)
+
+    post review_api_v1_transactions_url,
+         params: { ids: [ other_family_transaction.transaction.id ] },
+         headers: api_headers(@api_key)
+    assert_response :success
+    assert_equal 0, JSON.parse(response.body)["reviewed_count"]
+    assert_nil other_family_transaction.reload.reviewed_at
+  end
+
+  test "review requires ids" do
+    post review_api_v1_transactions_url, params: {}, headers: api_headers(@api_key)
+    assert_response :unprocessable_entity
+  end
+
+  test "review rejects a read-only key" do
+    post review_api_v1_transactions_url,
+         params: { ids: [ @transaction.id ] },
+         headers: api_headers(@read_only_api_key)
+    assert_response :forbidden
+  end
+
+  test "category_suggestions ranks categories used for the same merchant first" do
+    merchant = @family.merchants.create!(name: "Trader Joe's")
+    food = categories(:food_and_drink)
+    other = categories(:one)
+    2.times { |i| create_transaction(account: @account, amount: 20 + i, name: "TJ #{i}", merchant: merchant, category: food) }
+    create_transaction(account: @account, amount: 5, name: "TJ odd", merchant: merchant, category: other)
+    target = create_transaction(account: @account, amount: 40, name: "TRADER JOES #552", merchant: merchant).transaction
+
+    get category_suggestions_api_v1_transaction_url(target), headers: api_headers(@api_key)
+
+    assert_response :success
+    suggestions = JSON.parse(response.body)["suggestions"]
+    assert_equal food.id, suggestions.first["category_id"]
+    assert_equal "merchant_history", suggestions.first["source"]
+    assert_in_delta 0.67, suggestions.first["confidence"], 0.01
+    assert_includes suggestions.map { |s| s["category_id"] }, other.id
+    assert_operator suggestions.size, :<=, 3
+  end
+
+  test "category_suggestions falls back to the same transaction name without a merchant" do
+    food = categories(:food_and_drink)
+    create_transaction(account: @account, amount: 12, name: "Corner Deli", category: food)
+    target = create_transaction(account: @account, amount: 13, name: "corner deli").transaction
+
+    get category_suggestions_api_v1_transaction_url(target), headers: api_headers(@api_key)
+
+    assert_response :success
+    first = JSON.parse(response.body)["suggestions"].first
+    assert_equal food.id, first["category_id"]
+    assert_equal "name_history", first["source"]
+    assert_equal food.name, first["name"]
+  end
+
+  test "category_suggestions never suggests another family's category" do
+    target = create_transaction(account: @account, amount: 13, name: "Something new").transaction
+
+    get category_suggestions_api_v1_transaction_url(target), headers: api_headers(@api_key)
+
+    assert_response :success
+    family_category_ids = @family.categories.pluck(:id)
+    assert JSON.parse(response.body)["suggestions"].all? { |s| family_category_ids.include?(s["category_id"]) }
+  end
+
+  test "update can exclude and re-include a transaction" do
+    entry = create_transaction(account: @account, amount: 8, name: "Exclude me")
+
+    patch api_v1_transaction_url(entry.transaction), params: { transaction: { excluded: true } }, headers: api_headers(@api_key)
+    assert_response :success
+    assert JSON.parse(response.body)["excluded"]
+    assert entry.reload.excluded?
+
+    patch api_v1_transaction_url(entry.transaction), params: { transaction: { excluded: false } }, headers: api_headers(@api_key)
+    assert_response :success
+    assert_not entry.reload.excluded?
+  end
+
   private
 
     def api_headers(api_key)

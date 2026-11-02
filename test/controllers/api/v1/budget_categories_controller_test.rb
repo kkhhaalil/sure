@@ -270,4 +270,81 @@ class Api::V1::BudgetCategoriesControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_equal 500, later.budget_categories.find_by!(category: @category).reload[:rolled_over_amount]
   end
+
+  test "updates a budget category's allocation with a read-write key" do
+    patch api_v1_budget_category_url(@budget_category),
+          params: { budget_category: { budgeted_spending: 650 } },
+          headers: api_headers(write_key)
+
+    assert_response :success
+    body = JSON.parse(response.body)
+    assert_equal @budget_category.id, body["id"]
+    assert_equal 65_000, body["budgeted_spending_cents"]
+    assert_equal 650, @budget_category.reload.budgeted_spending
+  end
+
+  test "toggles rollover on a budget category" do
+    patch api_v1_budget_category_url(@budget_category),
+          params: { budget_category: { rollover_enabled: true } },
+          headers: api_headers(write_key)
+
+    assert_response :success
+    assert @budget_category.reload.rollover_enabled
+    assert_equal 500, @budget_category.budgeted_spending, "leaving budgeted_spending out keeps it"
+  end
+
+  test "rejects a negative allocation" do
+    patch api_v1_budget_category_url(@budget_category),
+          params: { budget_category: { budgeted_spending: -5 } },
+          headers: api_headers(write_key)
+
+    assert_response :unprocessable_entity
+    assert_equal 500, @budget_category.reload.budgeted_spending
+  end
+
+  test "rejects updating a budget category with a read-only key" do
+    patch api_v1_budget_category_url(@budget_category),
+          params: { budget_category: { budgeted_spending: 650 } },
+          headers: api_headers(@api_key)
+
+    assert_response :forbidden
+  end
+
+  test "cannot update another family's budget category" do
+    patch api_v1_budget_category_url(@other_budget_category),
+          params: { budget_category: { budgeted_spending: 1 } },
+          headers: api_headers(write_key)
+
+    assert_response :not_found
+    assert_equal 100, @other_budget_category.reload.budgeted_spending
+  end
+
+  test "index includes spending amounts when asked for one budget's envelopes" do
+    get api_v1_budget_categories_url, params: { budget_id: @budget.id, include_amounts: true }, headers: api_headers(@api_key)
+
+    assert_response :success
+    row = JSON.parse(response.body)["budget_categories"].find { |c| c["id"] == @budget_category.id }
+    assert row.key?("actual_spending_cents")
+    assert row.key?("available_to_spend_cents")
+  end
+
+  test "index leaves spending amounts out without a budget_id" do
+    get api_v1_budget_categories_url, params: { include_amounts: true }, headers: api_headers(@api_key)
+
+    assert_response :success
+    row = JSON.parse(response.body)["budget_categories"].find { |c| c["id"] == @budget_category.id }
+    assert_not row.key?("actual_spending_cents")
+  end
+
+  private
+
+    def write_key
+      @write_key ||= ApiKey.create!(
+        user: @user,
+        name: "Test Write Key",
+        scopes: [ "read_write" ],
+        source: "mobile",
+        display_key: "test_rw_#{SecureRandom.hex(8)}"
+      )
+    end
 end

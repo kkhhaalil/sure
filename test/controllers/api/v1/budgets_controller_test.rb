@@ -179,4 +179,67 @@ class Api::V1::BudgetsControllerTest < ActionDispatch::IntegrationTest
   ensure
     api_key_without_read&.destroy
   end
+
+  test "updates a budget's totals with a read-write key" do
+    budget = Budget.find_or_bootstrap(@family, start_date: Date.current, user: nil)
+
+    patch api_v1_budget_url(budget.id),
+          params: { budget: { budgeted_spending: 3_400, expected_income: 6_000 } },
+          headers: api_headers(budget_write_key)
+
+    assert_response :success
+    body = JSON.parse(response.body)
+    assert_equal 340_000, body["budgeted_spending_cents"]
+    assert_equal 600_000, body["expected_income_cents"]
+    assert_equal 3_400, budget.reload.budgeted_spending
+  end
+
+  test "rejects a budget update with a read-only key" do
+    budget = Budget.find_or_bootstrap(@family, start_date: Date.current, user: nil)
+
+    patch api_v1_budget_url(budget.id), params: { budget: { budgeted_spending: 1 } }, headers: api_headers(@api_key)
+
+    assert_response :forbidden
+  end
+
+  test "pace returns a cumulative daily series for the budget period" do
+    budget = Budget.find_or_bootstrap(@family, start_date: Date.current, user: nil)
+    budget.update!(budgeted_spending: 3_000)
+
+    get pace_api_v1_budget_url(budget.id), headers: api_headers(budget_write_key)
+
+    assert_response :success
+    body = JSON.parse(response.body)
+    assert_equal budget.start_date.iso8601, body["start_date"]
+    assert_equal budget.end_date.iso8601, body["end_date"]
+    assert_equal 300_000, body["budgeted_spending_cents"]
+    assert_operator body["points"].size, :>=, 1
+
+    point = body["points"].first
+    assert_equal %w[actual_cumulative_cents date ideal_cumulative_cents].sort, point.keys.sort
+    assert_equal body["points"].map { |p| p["date"] }.sort, body["points"].map { |p| p["date"] }
+    assert body["points"].each_cons(2).all? { |a, b| b["actual_cumulative_cents"] >= a["actual_cumulative_cents"] }
+    assert_equal 300_000, body["points"].last["ideal_cumulative_cents"] if body["points"].last["date"] == budget.end_date.iso8601
+  end
+
+  test "pace stops at today for the current period" do
+    budget = Budget.find_or_bootstrap(@family, start_date: Date.current, user: nil)
+
+    get pace_api_v1_budget_url(budget.id), headers: api_headers(budget_write_key)
+
+    assert_response :success
+    assert_equal [ Date.current, budget.end_date ].min.iso8601, JSON.parse(response.body)["points"].last["date"]
+  end
+
+  private
+
+    def budget_write_key
+      @budget_write_key ||= ApiKey.create!(
+        user: @user,
+        name: "Budget Write Key",
+        scopes: [ "read_write" ],
+        source: "mobile",
+        display_key: "budget_rw_#{SecureRandom.hex(8)}"
+      )
+    end
 end

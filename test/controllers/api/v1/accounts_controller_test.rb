@@ -303,6 +303,33 @@ class Api::V1::AccountsControllerTest < ActionDispatch::IntegrationTest
     assert_equal account_names.sort, account_names
   end
 
+  test "sync queues a sync for one account" do
+    account = @user.family.accounts.first
+    write_key = ApiKey.create!(user: @user, name: "Account sync", scopes: [ "read_write" ], source: "mobile", display_key: "acct_rw_#{SecureRandom.hex(8)}")
+
+    assert_difference -> { Sync.where(syncable: account).count }, 1 do
+      post sync_api_v1_account_url(account), headers: api_headers(write_key)
+    end
+
+    assert_response :accepted
+    body = JSON.parse(response.body)
+    assert_equal "Account", body["syncable_type"]
+    assert_equal account.id, body["syncable_id"]
+  end
+
+  test "sync rejects a read-only key" do
+    post sync_api_v1_account_url(@user.family.accounts.first), headers: api_headers(@api_key)
+    assert_response :forbidden
+  end
+
+  test "sync cannot reach another family's account" do
+    other_account = families(:empty).accounts.create!(name: "Theirs", balance: 0, currency: "USD", accountable: Depository.new)
+    write_key = ApiKey.create!(user: @user, name: "Account sync", scopes: [ "read_write" ], source: "mobile", display_key: "acct_rw_#{SecureRandom.hex(8)}")
+
+    post sync_api_v1_account_url(other_account), headers: api_headers(write_key)
+    assert_response :not_found
+  end
+
   private
 
     def api_headers(api_key)

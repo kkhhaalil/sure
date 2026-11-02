@@ -283,4 +283,92 @@ class Api::V1::PushSubscriptionsControllerTest < ActionDispatch::IntegrationTest
       assert subscription.eligible?
     end
   end
+
+  test "registers a Web Push subscription on a self-hosted server with VAPID keys" do
+    Rails.application.config.stubs(:app_mode).returns("self_hosted".inquiry)
+
+    with_env_overrides(vapid_env) do
+      assert_difference "PushSubscription.count", 1 do
+        post api_v1_push_subscriptions_url,
+             params: { platform: "web", endpoint: web_endpoint, keys: { p256dh: "BPublicKey", auth: "authsecret" } },
+             headers: @headers, as: :json
+      end
+    end
+
+    assert_response :created
+    subscription = PushSubscription.order(:created_at).last
+    assert_equal "web", subscription.platform
+    assert_equal web_endpoint, subscription.endpoint
+    assert_equal "BPublicKey", subscription.p256dh
+    assert_equal "authsecret", subscription.auth_secret
+    assert_equal "web", response.parsed_body["platform"]
+  end
+
+  test "re-registering the same Web Push endpoint refreshes it" do
+    Rails.application.config.stubs(:app_mode).returns("self_hosted".inquiry)
+
+    with_env_overrides(vapid_env) do
+      2.times do |i|
+        post api_v1_push_subscriptions_url,
+             params: { platform: "web", endpoint: web_endpoint, keys: { p256dh: "key#{i}", auth: "auth#{i}" } },
+             headers: @headers, as: :json
+      end
+    end
+
+    assert_equal 1, PushSubscription.where(platform: "web").count
+    assert_equal "key1", PushSubscription.find_by!(platform: "web").p256dh
+  end
+
+  test "rejects Web Push when VAPID keys are not configured" do
+    Rails.application.config.stubs(:app_mode).returns("self_hosted".inquiry)
+
+    with_env_overrides(WEB_PUSH_VAPID_PUBLIC_KEY: nil, WEB_PUSH_VAPID_PRIVATE_KEY: nil) do
+      post api_v1_push_subscriptions_url,
+           params: { platform: "web", endpoint: web_endpoint, keys: { p256dh: "k", auth: "a" } },
+           headers: @headers, as: :json
+    end
+
+    assert_response :forbidden
+  end
+
+  test "rejects a Web Push subscription without keys" do
+    Rails.application.config.stubs(:app_mode).returns("self_hosted".inquiry)
+
+    with_env_overrides(vapid_env) do
+      post api_v1_push_subscriptions_url, params: { platform: "web", endpoint: web_endpoint }, headers: @headers, as: :json
+    end
+
+    assert_response :unprocessable_entity
+  end
+
+  test "rejects a Web Push endpoint that is not an https URL" do
+    Rails.application.config.stubs(:app_mode).returns("self_hosted".inquiry)
+
+    with_env_overrides(vapid_env) do
+      [ "http://push.example.com/x", "https://", "javascript:alert(1)\nhttps://x" ].each do |endpoint|
+        post api_v1_push_subscriptions_url,
+             params: { platform: "web", endpoint: endpoint, keys: { p256dh: "k", auth: "a" } },
+             headers: @headers, as: :json
+        assert_response :unprocessable_entity, endpoint
+      end
+    end
+  end
+
+  test "exposes the VAPID public key" do
+    with_env_overrides(vapid_env) do
+      get vapid_public_key_api_v1_push_subscriptions_url, headers: @headers
+    end
+
+    assert_response :success
+    assert_equal "BVapidPublic", response.parsed_body["public_key"]
+  end
+
+  private
+    def vapid_env
+      { WEB_PUSH_VAPID_PUBLIC_KEY: "BVapidPublic", WEB_PUSH_VAPID_PRIVATE_KEY: "vapidPrivate", WEB_PUSH_VAPID_SUBJECT: "mailto:admin@example.com" }
+    end
+
+    def web_endpoint
+      "https://web.push.apple.com/QGuQyavXutnMH_web_push_test"
+    end
 end

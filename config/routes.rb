@@ -791,21 +791,31 @@ Rails.application.routes.draw do
       post "auth/sso_link", to: "auth#sso_link"
       post "auth/sso_create_account", to: "auth#sso_create_account"
       patch "auth/enable_ai", to: "auth#enable_ai"
+      post "auth/logout", to: "auth#logout"
 
       # Production API endpoints
-      resources :accounts, only: [ :index, :show ]
+      resources :accounts, only: [ :index, :show ] do
+        post :sync, on: :member
+      end
       resources :balances, only: [ :index, :show ]
-      resources :budgets, only: [ :index, :show ]
-      resources :budget_categories, only: [ :index, :show ]
+      resources :budgets, only: [ :index, :show, :update ] do
+        get :pace, on: :member
+      end
+      resources :budget_categories, only: [ :index, :show, :update ]
       resources :categories, only: [ :index, :show, :create ]
       resources :merchants, only: [ :index, :show, :create ]
-      resources :rules, only: [ :index, :show ]
+      resources :rules, only: [ :index, :show, :create, :update, :destroy ] do
+        post :apply, on: :member
+        post :from_transaction, on: :collection
+      end
       resources :rule_runs, only: [ :index, :show ]
       resources :securities, only: [ :index, :show ]
       resources :security_prices, only: [ :index, :show ]
       resources :tags, only: [ :index, :show, :create, :update, :destroy ]
 
       resources :transactions, only: [ :index, :show, :create, :update, :destroy ] do
+        post :review, on: :collection
+        get :category_suggestions, on: :member
         resource :split, only: [ :show, :create, :update, :destroy ]
       end
       resources :trades, only: [ :index, :show, :create, :update, :destroy ]
@@ -826,11 +836,17 @@ Rails.application.routes.draw do
         post :publish, on: :member
       end
       resource :usage, only: [ :show ], controller: :usage
-      resource :cash_flow, only: [ :show ], controller: :cash_flows
+      resource :cash_flow, only: [ :show ], controller: :cash_flows do
+        get :series
+      end
       resource :spending_vs_normal, only: [ :show ], controller: :spending_vs_normal
-      resource :balance_sheet, only: [ :show ], controller: :balance_sheet
-      resources :insights, only: [ :index ]
-      resources :push_subscriptions, only: [ :create, :destroy ]
+      resource :balance_sheet, only: [ :show ], controller: :balance_sheet do
+        get :series
+      end
+      resources :insights, only: [ :index, :update ]
+      resources :push_subscriptions, only: [ :create, :destroy ] do
+        get :vapid_public_key, on: :collection
+      end
       resource :family_settings, only: [ :show ], controller: :family_settings
       post :sync, to: "sync#create", as: :sync_job
       resources :syncs, only: [ :index, :show ] do

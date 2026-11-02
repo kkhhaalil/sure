@@ -211,6 +211,17 @@ class Api::V1::ChatsControllerTest < ActionDispatch::IntegrationTest
     assert_not_includes chat_ids, impersonated_chat.id
   end
 
+  test "chat messages expose their status" do
+    @chat.messages.create!(type: "AssistantMessage", content: "", ai_model: "gpt-4.1", status: "pending")
+
+    get "/api/v1/chats/#{@chat.id}", headers: bearer_auth_header(@read_token)
+
+    assert_response :success
+    statuses = JSON.parse(response.body)["messages"].map { |m| m["status"] }
+    assert_includes statuses, "pending"
+    assert statuses.all?(&:present?)
+  end
+
   private
 
     def bearer_auth_header(token)

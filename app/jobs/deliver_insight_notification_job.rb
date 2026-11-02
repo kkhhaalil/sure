@@ -7,7 +7,7 @@ class DeliverInsightNotificationJob < ApplicationJob
   discard_on ActiveRecord::RecordNotFound
 
   def self.enqueue_for(insight)
-    return unless Apns::Client.available? && insight.priority_high? && insight.active?
+    return unless PushSubscription.delivery_available? && insight.priority_high? && insight.active?
 
     insight.family.users.includes(:push_subscriptions).find_each do |user|
       next unless user.active? && user.preview_features_enabled?
@@ -19,7 +19,7 @@ class DeliverInsightNotificationJob < ApplicationJob
   end
 
   def perform(insight_id:, push_subscription_id:)
-    return unless Apns::Client.available?
+    return unless PushSubscription.delivery_available?
 
     insight = Insight.find(insight_id)
     subscription = PushSubscription.find(push_subscription_id)

@@ -156,7 +156,122 @@ class Api::V1::RulesControllerTest < ActionDispatch::IntegrationTest
     assert_equal "record_not_found", json_response["error"]
   end
 
+  test "creates a rule with conditions and actions" do
+    category = categories(:food_and_drink)
+
+    assert_difference -> { @family.rules.count }, 1 do
+      post api_v1_rules_url,
+           params: {
+             rule: {
+               name: "Groceries",
+               resource_type: "transaction",
+               active: true,
+               conditions_attributes: [ { condition_type: "transaction_name", operator: "like", value: "whole foods" } ],
+               actions_attributes: [ { action_type: "set_transaction_category", value: category.id } ]
+             }
+           },
+           headers: api_headers(write_key)
+    end
+
+    assert_response :created
+    body = JSON.parse(response.body)["data"]
+    assert_equal "Groceries", body["name"]
+    assert_equal "set_transaction_category", body["actions"].first["action_type"]
+  end
+
+  test "rejects a rule without actions" do
+    post api_v1_rules_url,
+         params: { rule: { resource_type: "transaction", conditions_attributes: [ { condition_type: "transaction_name", operator: "like", value: "x" } ] } },
+         headers: api_headers(write_key)
+
+    assert_response :unprocessable_entity
+  end
+
+  test "rejects rule writes with a read-only key" do
+    post api_v1_rules_url, params: { rule: { resource_type: "transaction" } }, headers: api_headers(@api_key)
+    assert_response :forbidden
+  end
+
+  test "updates a rule" do
+    patch api_v1_rule_url(@rule), params: { rule: { name: "Coffee shops", active: false } }, headers: api_headers(write_key)
+
+    assert_response :success
+    assert_equal "Coffee shops", @rule.reload.name
+    assert_not @rule.active
+  end
+
+  test "destroys a rule" do
+    assert_difference -> { @family.rules.count }, -1 do
+      delete api_v1_rule_url(@rule), headers: api_headers(write_key)
+    end
+    assert_response :success
+  end
+
+  test "apply activates the rule and queues a run" do
+    @rule.update!(active: false)
+
+    assert_enqueued_with(job: RuleJob) do
+      post apply_api_v1_rule_url(@rule), headers: api_headers(write_key)
+    end
+
+    assert_response :accepted
+    assert @rule.reload.active
+  end
+
+  test "from_transaction builds a merchant rule that sets the category" do
+    merchant = @family.merchants.create!(name: "Whole Foods")
+    entry = @family.accounts.first.entries.create!(
+      name: "WHOLEFDS #123", amount: 86.4, currency: "USD", date: Date.current,
+      entryable: Transaction.new(merchant: merchant)
+    )
+    category = categories(:food_and_drink)
+
+    post from_transaction_api_v1_rules_url,
+         params: { transaction_id: entry.transaction.id, category_id: category.id },
+         headers: api_headers(write_key)
+
+    assert_response :created
+    rule = @family.rules.order(:created_at).last
+    assert_equal [ [ "transaction_merchant", "=", merchant.id ] ], rule.conditions.map { |c| [ c.condition_type, c.operator, c.value ] }
+    assert_equal [ [ "set_transaction_category", category.id ] ], rule.actions.map { |a| [ a.action_type, a.value ] }
+    assert rule.active
+  end
+
+  test "from_transaction falls back to the transaction name when there is no merchant" do
+    entry = @family.accounts.first.entries.create!(
+      name: "UBER *TRIP", amount: 23.1, currency: "USD", date: Date.current, entryable: Transaction.new
+    )
+
+    post from_transaction_api_v1_rules_url,
+         params: { transaction_id: entry.transaction.id, category_id: categories(:food_and_drink).id },
+         headers: api_headers(write_key)
+
+    assert_response :created
+    condition = @family.rules.order(:created_at).last.conditions.first
+    assert_equal [ "transaction_name", "like", "UBER *TRIP" ], [ condition.condition_type, condition.operator, condition.value ]
+  end
+
+  test "from_transaction rejects a category from another family" do
+    other_category = families(:empty).categories.create!(name: "Theirs", color: "#111111")
+
+    post from_transaction_api_v1_rules_url,
+         params: { transaction_id: @family.transactions.first.id, category_id: other_category.id },
+         headers: api_headers(write_key)
+
+    assert_response :not_found
+  end
+
   private
+
+    def write_key
+      @write_key ||= ApiKey.create!(
+        user: @user,
+        name: "Rules Write Key",
+        scopes: [ "read_write" ],
+        source: "mobile",
+        display_key: "rules_rw_#{SecureRandom.hex(8)}"
+      )
+    end
 
     def api_key_without_read_scope
       # Valid persisted API keys can only be read/read_write; this intentionally

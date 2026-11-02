@@ -3,9 +3,10 @@
 class Api::V1::BudgetCategoriesController < Api::V1::BaseController
   include Pagy::Backend
 
-  before_action :ensure_read_scope
-  before_action :refresh_rollover_chains
-  before_action :set_budget_category, only: :show
+  before_action :ensure_read_scope, only: %i[index show]
+  before_action :ensure_write_scope, only: :update
+  before_action :refresh_rollover_chains, only: %i[index show]
+  before_action :set_budget_category, only: %i[show update]
 
   def index
     budget_categories_query = apply_filters(budget_categories_scope)
@@ -17,6 +18,9 @@ class Api::V1::BudgetCategoriesController < Api::V1::BaseController
       page: safe_page_param,
       limit: @per_page
     )
+    # Spending amounts cost a query per budget, so they are opt-in and only
+    # for one budget's envelopes (what a budget screen shows).
+    @include_amounts = params[:budget_id].present? && ActiveModel::Type::Boolean.new.cast(params[:include_amounts])
 
     render :index
   end
@@ -25,7 +29,40 @@ class Api::V1::BudgetCategoriesController < Api::V1::BaseController
     render :show
   end
 
+  # Mirrors the web budget page's envelope edit: the rollover choice is
+  # carried forward to later months, and the rollover chain is recomputed
+  # after the allocation changes so rolled_over_amount stays current.
+  def update
+    raise ActiveRecord::RecordNotFound unless @budget_category.budget.editable_by?(current_resource_owner)
+
+    budgeted_spending = update_params[:budgeted_spending]
+    if budgeted_spending.present? && budgeted_spending.to_d.negative?
+      render json: { error: "validation_failed", message: "budgeted_spending must not be negative" }, status: :unprocessable_entity
+      return
+    end
+
+    unless update_params[:rollover_enabled].nil?
+      @budget_category.update!(rollover_enabled: ActiveModel::Type::Boolean.new.cast(update_params[:rollover_enabled]))
+      @budget_category.propagate_rollover_choice_forward!
+    end
+    @budget_category.update_budgeted_spending!(budgeted_spending.to_d) if budgeted_spending.present?
+
+    budget = @budget_category.budget
+    Budget::RolloverCalculator.new(family: budget.family, user: budget.user).recompute!
+    @budget_category.reload
+    render :show
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { error: "validation_failed", message: e.record.errors.full_messages.to_sentence }, status: :unprocessable_entity
+  end
+
   private
+    def update_params
+      params.require(:budget_category).permit(:budgeted_spending, :rollover_enabled)
+    end
+
+    def ensure_write_scope
+      authorize_scope!(:write)
+    end
 
     def set_budget_category
       raise ActiveRecord::RecordNotFound unless valid_uuid?(params[:id])

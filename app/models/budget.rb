@@ -461,6 +461,30 @@ class Budget < ApplicationRecord
     (budgeted_spending || 0) - actual_spending
   end
 
+  PacePoint = Data.define(:date, :actual_cumulative, :ideal_cumulative)
+
+  # Cumulative spending per day from the start of the period through as_of
+  # (or the end of the period once it has passed), beside the straight-line
+  # pace that lands exactly on budgeted_spending on the last day. Uses the
+  # dashboard's daily expense series, so refunds are not netted out the way
+  # actual_spending nets them.
+  def pace_series(as_of: Date.current)
+    last_day = [ end_date, as_of ].min
+    return [] if last_day < start_date
+
+    daily = income_statement
+      .daily_expense_series(period: Period.custom(start_date: start_date, end_date: last_day))
+      .index_by(&:date)
+    total_days = (end_date - start_date).to_i + 1
+    budget_total = (budgeted_spending || 0).to_d
+    running = 0.to_d
+
+    (start_date..last_day).each_with_index.map do |date, index|
+      running += (daily[date]&.total || 0).to_d
+      PacePoint.new(date: date, actual_cumulative: running, ideal_cumulative: budget_total * (index + 1) / total_days)
+    end
+  end
+
   def percent_of_budget_spent
     return 0 unless budgeted_spending > 0
 

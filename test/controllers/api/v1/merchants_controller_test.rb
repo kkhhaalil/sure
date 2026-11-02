@@ -184,6 +184,17 @@ class Api::V1::MerchantsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "invalid_file_type", body["error"]
   end
 
+  test "merchant JSON includes logo and website" do
+    merchant = @user.family.merchants.create!(name: "Blue Bottle", logo_url: "https://logo.example/bb.png", website_url: "https://bluebottlecoffee.com")
+
+    get api_v1_merchant_url(merchant), headers: auth_headers
+
+    assert_response :success
+    body = JSON.parse(response.body)
+    assert_equal "https://logo.example/bb.png", body["logo_url"]
+    assert_equal "https://bluebottlecoffee.com", body["website_url"]
+  end
+
   private
 
     def auth_headers

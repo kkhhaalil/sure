@@ -6,7 +6,7 @@ module Api
       skip_before_action :authenticate_request!
       skip_before_action :check_api_key_rate_limit
       skip_before_action :log_api_access
-      before_action :authenticate_request!, only: :enable_ai
+      before_action :authenticate_request!, only: %i[enable_ai logout]
       before_action :ensure_write_scope, only: :enable_ai
       before_action :check_api_key_rate_limit, only: :enable_ai
       before_action :log_api_access, only: :enable_ai
@@ -354,6 +354,19 @@ module Api
         else
           render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
         end
+      end
+
+      # Revokes the OAuth access token the request was made with, so a client's
+      # "Sign out" ends that token server-side, not only on the device.
+      # Public clients cannot use /oauth/revoke without client credentials.
+      def logout
+        unless doorkeeper_token
+          render json: { error: "Only OAuth tokens can be signed out" }, status: :unprocessable_entity
+          return
+        end
+
+        doorkeeper_token.revoke
+        head :no_content
       end
 
       def enable_ai
